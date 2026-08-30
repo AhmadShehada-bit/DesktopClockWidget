@@ -1,0 +1,33 @@
+# Build outputs
+bin/
+obj/
+release/
+*.exe
+*.dll
+*.pdb
+
+# User and runtime settings
+*.user
+*.suo
+*.useros
+*.settings
+*.log
+*.tmp
+*.bak
+
+# Test logs and diagnostics
+selftest-result.txt
+dragtest-result.txt
+crash.log
+run_trace.log
+exit_reason.txt
+
+# Development artifacts
+*.ps1
+*.py
+.tempmediaStorage/
+direct-render-test.png
+widget-effects-preview.png
+widget-effects-active.png
+widget-curated-fonts.png
+widget-curated-preview.png

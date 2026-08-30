@@ -1,0 +1,42 @@
+name: Build DesktopClock Widget
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout Source
+      uses: actions/checkout@v4
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Build Project
+      shell: cmd
+      run: |
+        call build.bat
+
+    - name: Create Portable Release Package
+      shell: pwsh
+      run: |
+        $releaseDir = "release\DesktopClockWidget-v1.0.0"
+        New-Item -ItemType Directory -Force -Path "$releaseDir\Fonts" | Out-Null
+        Copy-Item "bin\Release\DesktopClockWidget.exe" "$releaseDir\" -Force
+        Copy-Item "Fonts\*.ttf" "$releaseDir\Fonts\" -Force
+        Copy-Item "LICENSE" "$releaseDir\" -Force
+        Copy-Item "README.md" "$releaseDir\" -Force
+        Copy-Item "THIRD_PARTY_NOTICES.md" "$releaseDir\" -Force
+        Compress-Archive -Path "$releaseDir\*" -DestinationPath "DesktopClockWidget-v1.0.0-portable.zip" -Force
+
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: DesktopClockWidget-v1.0.0-portable
+        path: DesktopClockWidget-v1.0.0-portable.zip
