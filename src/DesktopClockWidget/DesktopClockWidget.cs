@@ -1527,6 +1527,8 @@ namespace DesktopClock
         private const int HOTKEY_ID = 9001;
         private const int WM_HOTKEY = 0x0312;
 
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        private static extern uint RegisterWindowMessage(string lpString);
         [DllImport("user32.dll", SetLastError = true)]
         private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
         [DllImport("user32.dll", SetLastError = true)]
@@ -1963,6 +1965,7 @@ namespace DesktopClock
                     {
                         _hwndSource.AddHook(HwndHook);
                         RegisterHotKey(_hwndSource.Handle, HOTKEY_ID, MOD_CONTROL | MOD_ALT, VK_C);
+                        try { _wmTaskbarCreated = RegisterWindowMessage("TaskbarCreated"); } catch { }
                     }
                 }
             }
@@ -2000,6 +2003,11 @@ namespace DesktopClock
                 ApplySettings();
                 UpdateDateTime();
                 Opacity = 1;
+
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    GC.Collect(2, GCCollectionMode.Optimized);
+                }), DispatcherPriority.ApplicationIdle, null);
             }), DispatcherPriority.Loaded, null);
 
             _timeTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
@@ -2017,6 +2025,11 @@ namespace DesktopClock
             if (msg == WM_HOTKEY && wParam.ToInt32() == HOTKEY_ID)
             {
                 SetEditing(!_editing);
+                handled = true;
+            }
+            else if (_wmTaskbarCreated != 0 && (uint)msg == _wmTaskbarCreated)
+            {
+                CreateTrayIcon();
                 handled = true;
             }
             return IntPtr.Zero;
@@ -2165,22 +2178,50 @@ namespace DesktopClock
             catch { return 1.0; }
         }
 
+        private int _lastRenderedMinute = -1;
+        private int _lastRenderedDay = -1;
+        private int _lastRenderedHour = -1;
+
         private void TimeTimer_Tick(object sender, EventArgs e)
         {
-            UpdateDateTime();
-            if (_settings != null && _settings.GreetingMode == 0) ApplyGreeting();
+            var now = DateTime.Now;
+            UpdateDateTime(false);
+            if (_settings != null && _settings.GreetingMode == 0 && now.Hour != _lastRenderedHour)
+            {
+                _lastRenderedHour = now.Hour;
+                ApplyGreeting();
+            }
             UpdateRotatingBlocks();
         }
 
         public void UpdateDateTime()
         {
+            UpdateDateTime(true);
+        }
+
+        public void UpdateDateTime(bool force)
+        {
             var now = DateTime.Now;
             var culture = CultureInfo.InvariantCulture;
-            string weekday = now.ToString("dddd", culture);
-            _weekdayText.Text = TextCaseHelper.ApplyCase(weekday, _settings.Weekday != null ? _settings.Weekday.Case : "Title");
-            _timeText.Text = now.ToString("hh:mm tt", culture);
-            string date = now.ToString("dd MMM", culture);
-            _dateText.Text = TextCaseHelper.ApplyCase(date, _settings.Date != null ? _settings.Date.Case : "Upper");
+
+            if (force || now.Minute != _lastRenderedMinute)
+            {
+                _lastRenderedMinute = now.Minute;
+                string newTime = now.ToString("hh:mm tt", culture);
+                if (_timeText.Text != newTime) _timeText.Text = newTime;
+            }
+
+            if (force || now.Day != _lastRenderedDay)
+            {
+                _lastRenderedDay = now.Day;
+                string weekday = now.ToString("dddd", culture);
+                string newWeekday = TextCaseHelper.ApplyCase(weekday, _settings.Weekday != null ? _settings.Weekday.Case : "Title");
+                if (_weekdayText.Text != newWeekday) _weekdayText.Text = newWeekday;
+
+                string date = now.ToString("dd MMM", culture);
+                string newDate = TextCaseHelper.ApplyCase(date, _settings.Date != null ? _settings.Date.Case : "Upper");
+                if (_dateText.Text != newDate) _dateText.Text = newDate;
+            }
         }
 
         private void UpdateRotatingBlocks()
@@ -2298,29 +2339,44 @@ namespace DesktopClock
             e.Handled = true;
         }
 
+        private static uint _wmTaskbarCreated = 0;
+
         private void CreateTrayIcon()
         {
-            if (_trayIcon != null) return;
             try
             {
+                if (_trayIcon != null)
+                {
+                    try { _trayIcon.Visible = false; _trayIcon.Dispose(); } catch { }
+                    _trayIcon = null;
+                }
+
                 _trayIcon = new NotifyIcon
                 {
-                    Text = "Desktop Clock Widget",
+                    Text = "DesktopClock Widget",
                     Icon = GenerateClockIcon(),
                     Visible = true
                 };
 
                 var menu = new ContextMenuStrip();
-                var itemEdit = new ToolStripMenuItem("Edit Position (Ctrl+Alt+C)", null, (s, e) => SetEditing(!_editing));
+                var headerItem = new ToolStripMenuItem("DesktopClock Widget")
+                {
+                    Enabled = false,
+                    Font = new System.Drawing.Font(System.Drawing.SystemFonts.DefaultFont, System.Drawing.FontStyle.Bold)
+                };
+                var itemSep0 = new ToolStripSeparator();
+                var itemEdit = new ToolStripMenuItem(_editing ? "Lock Position (Ctrl+Alt+C)" : "Edit Position (Ctrl+Alt+C)", null, (s, e) => SetEditing(!_editing));
                 var itemCenter = new ToolStripMenuItem("Center on Screen", null, (s, e) => { CenterOnScreen(); SaveSettings(); });
                 var itemSettings = new ToolStripMenuItem("Settings...", null, (s, e) => ShowSettings());
-                var itemSep = new ToolStripSeparator();
+                var itemSep1 = new ToolStripSeparator();
                 var itemExit = new ToolStripMenuItem("Exit", null, (s, e) => Close());
 
+                menu.Items.Add(headerItem);
+                menu.Items.Add(itemSep0);
                 menu.Items.Add(itemEdit);
                 menu.Items.Add(itemCenter);
                 menu.Items.Add(itemSettings);
-                menu.Items.Add(itemSep);
+                menu.Items.Add(itemSep1);
                 menu.Items.Add(itemExit);
 
                 _trayIcon.ContextMenuStrip = menu;
@@ -2352,7 +2408,14 @@ namespace DesktopClock
                 return;
             }
             _openSettingsWindow = new SettingsWindow(this, _settings);
-            _openSettingsWindow.Closed += (s, e) => { _openSettingsWindow = null; };
+            _openSettingsWindow.Closed += (s, e) =>
+            {
+                _openSettingsWindow = null;
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    GC.Collect(2, GCCollectionMode.Optimized);
+                }), DispatcherPriority.ApplicationIdle, null);
+            };
             _openSettingsWindow.Show();
         }
 
