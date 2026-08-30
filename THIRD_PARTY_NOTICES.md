@@ -22,3 +22,8 @@ The bundled fonts in `Fonts/` are distributed under their respective open-source
 
 Full text of the SIL Open Font License 1.1: http://scripts.sil.org/OFL
 Full text of Apache 2.0 License: http://www.apache.org/licenses/LICENSE-2.0
+
+
+## Google Fonts (SIL Open Font License 1.1 / Apache 2.0)
+All curated fonts included with DesktopClock Widget are open-source fonts distributed under the SIL Open Font License 1.1 or Apache License 2.0.
+Sources: Google Fonts Open Source Font Repository (https://github.com/google/fonts)
