@@ -1,75 +1,91 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" width="100%" height="100%">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 440" width="100%" height="100%">
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0B0D10"/>
-      <stop offset="50%" stop-color="#12151B"/>
-      <stop offset="100%" stop-color="#08090C"/>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#080A0D"/>
+      <stop offset="50%" stop-color="#10131A"/>
+      <stop offset="100%" stop-color="#060709"/>
     </linearGradient>
-    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+    <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" stop-color="#00F0FF"/>
-      <stop offset="100%" stop-color="#7000FF"/>
+      <stop offset="100%" stop-color="#0080FF"/>
     </linearGradient>
-    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#FFFFFF"/>
-      <stop offset="100%" stop-color="#D6D3D0"/>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F0FF"/>
+      <stop offset="60%" stop-color="#7000FF"/>
+      <stop offset="100%" stop-color="#FF007F"/>
     </linearGradient>
-    <radialGradient id="glow" cx="20%" cy="30%" r="60%">
-      <stop offset="0%" stop-color="#00F0FF" stop-opacity="0.12"/>
-      <stop offset="100%" stop-color="#00F0FF" stop-opacity="0"/>
+    <radialGradient id="cyanGlow" cx="25%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#00F0FF" stop-opacity="0.14"/>
+      <stop offset="60%" stop-color="#00F0FF" stop-opacity="0.02"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
     </radialGradient>
-    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
-      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.5"/>
+    <radialGradient id="purpleGlow" cx="85%" cy="65%" r="55%">
+      <stop offset="0%" stop-color="#7000FF" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.6"/>
     </filter>
   </defs>
 
-  <!-- Background -->
-  <rect width="1200" height="420" rx="16" fill="url(#bg)"/>
-  <rect width="1200" height="420" rx="16" fill="url(#glow)"/>
+  <!-- Background Canvas -->
+  <rect width="1200" height="440" rx="16" fill="url(#bgGrad)"/>
+  <rect width="1200" height="440" rx="16" fill="url(#cyanGlow)"/>
+  <rect width="1200" height="440" rx="16" fill="url(#purpleGlow)"/>
   
-  <!-- Subtle Border -->
-  <rect x="1" y="1" width="1198" height="418" rx="15" fill="none" stroke="#252A34" stroke-width="1.5"/>
+  <!-- Subtle Border Outer Line -->
+  <rect x="1" y="1" width="1198" height="438" rx="15" fill="none" stroke="#1E232E" stroke-width="1.5"/>
 
-  <!-- Logo Glow & Symbol -->
-  <g transform="translate(90, 110)">
-    <!-- Outer Hex Ring -->
-    <polygon points="100,10 180,55 180,145 100,190 20,145 20,55" fill="#13171E" stroke="url(#accent)" stroke-width="4" filter="url(#shadow)"/>
-    <!-- Cyber Clock Dial -->
-    <circle cx="100" cy="100" r="62" fill="#181D26" stroke="#2A3140" stroke-width="2"/>
-    <!-- Clock Ticks -->
-    <line x1="100" y1="46" x2="100" y2="54" stroke="#00F0FF" stroke-width="3" stroke-linecap="round"/>
-    <line x1="100" y1="146" x2="100" y2="154" stroke="#00F0FF" stroke-width="3" stroke-linecap="round"/>
-    <line x1="46" y1="100" x2="54" y2="100" stroke="#00F0FF" stroke-width="3" stroke-linecap="round"/>
-    <line x1="146" y1="100" x2="154" y2="100" stroke="#00F0FF" stroke-width="3" stroke-linecap="round"/>
-    <!-- Clock Hands -->
-    <line x1="100" y1="100" x2="100" y2="64" stroke="#00F0FF" stroke-width="4" stroke-linecap="round"/>
-    <line x1="100" y1="100" x2="132" y2="100" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
-    <!-- Center Dot -->
-    <circle cx="100" cy="100" r="5" fill="#00F0FF"/>
+  <!-- Background Decorative HUD Circles -->
+  <g opacity="0.15">
+    <circle cx="1020" cy="220" r="170" fill="none" stroke="#00F0FF" stroke-width="1" stroke-dasharray="4,8"/>
+    <circle cx="1020" cy="220" r="140" fill="none" stroke="#7000FF" stroke-width="1"/>
+    <circle cx="1020" cy="220" r="210" fill="none" stroke="#00F0FF" stroke-width="0.5" stroke-dasharray="2,12"/>
   </g>
 
-  <!-- Main Typography -->
-  <g transform="translate(340, 135)">
-    <!-- Tag -->
-    <rect x="0" y="0" width="164" height="26" rx="13" fill="#18232C" stroke="#00F0FF" stroke-width="1"/>
-    <text x="82" y="17" fill="#00F0FF" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" letter-spacing="1.5" text-anchor="middle">WINDOWS UTILITY</text>
+  <!-- Logo Mark (Left) -->
+  <g transform="translate(80, 115)">
+    <!-- Hexagon Frame with Glow -->
+    <polygon points="105,10 190,58 190,152 105,200 20,152 20,58" fill="#11151D" stroke="url(#accentGrad)" stroke-width="3.5" filter="url(#cardShadow)"/>
+    <!-- Cyber Clock Inner Circle -->
+    <circle cx="105" cy="105" r="66" fill="#161B24" stroke="#252E3E" stroke-width="2"/>
+    <!-- Cardinal Ticks -->
+    <line x1="105" y1="48" x2="105" y2="58" stroke="#00F0FF" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="105" y1="152" x2="105" y2="162" stroke="#00F0FF" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="48" y1="105" x2="58" y2="105" stroke="#00F0FF" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="152" y1="105" x2="162" y2="105" stroke="#00F0FF" stroke-width="3.5" stroke-linecap="round"/>
+    <!-- Clock Hands -->
+    <line x1="105" y1="105" x2="105" y2="68" stroke="#00F0FF" stroke-width="4.5" stroke-linecap="round"/>
+    <line x1="105" y1="105" x2="140" y2="105" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round"/>
+    <!-- Center Dot -->
+    <circle cx="105" cy="105" r="5.5" fill="#00F0FF"/>
+  </g>
+
+  <!-- Main Product Typography (Center) -->
+  <g transform="translate(325, 120)">
+    <!-- Pill Badge -->
+    <rect x="0" y="0" width="180" height="28" rx="14" fill="#141E28" stroke="#00F0FF" stroke-width="1.2"/>
+    <text x="90" y="18" fill="#00F0FF" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" letter-spacing="1.5" text-anchor="middle">WINDOWS UTILITY</text>
     
     <!-- Title -->
-    <text x="0" y="72" fill="url(#textGrad)" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Orbitron', Roboto, sans-serif" font-size="44" font-weight="800" letter-spacing="0.5">DesktopClock Widget</text>
+    <text x="0" y="78" fill="#FFFFFF" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="46" font-weight="800" letter-spacing="-0.5">DesktopClock Widget</text>
     
     <!-- Subtitle -->
-    <text x="0" y="112" fill="#8F9CAE" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="400">A lightweight, highly customizable desktop clock with 217+ curated fonts,</text>
-    <text x="0" y="138" fill="#8F9CAE" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="400">wheel browsing, visual effects, and stable multi-element positioning.</text>
+    <text x="0" y="122" fill="#94A3B8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="400">A lightweight, highly customizable desktop clock with 217+ fonts,</text>
+    <text x="0" y="150" fill="#94A3B8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="400">fast wheel browsing, visual effects, and zero-jitter layout stability.</text>
 
     <!-- Tagline -->
-    <text x="0" y="185" fill="#00F0FF" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="600" letter-spacing="1">YOUR DESKTOP. YOUR TIME. YOUR STYLE.</text>
+    <text x="0" y="200" fill="url(#cyanGrad)" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="700" letter-spacing="1.2">YOUR DESKTOP. YOUR TIME. YOUR STYLE.</text>
   </g>
 
-  <!-- Live Clock Preview Mockup (Right side) -->
-  <g transform="translate(940, 110)">
-    <rect x="0" y="0" width="200" height="200" rx="12" fill="#13171E" stroke="#252A34" stroke-width="1.5"/>
-    <text x="100" y="45" fill="#7E8B9B" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="11" font-weight="600" letter-spacing="2" text-anchor="middle">GOOD AFTERNOON</text>
-    <text x="100" y="80" fill="#00F0FF" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="17" font-weight="700" letter-spacing="1" text-anchor="middle">Sunday</text>
-    <text x="100" y="132" fill="#FFFFFF" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Audiowide', monospace" font-size="34" font-weight="800" text-anchor="middle">01:23</text>
-    <text x="100" y="165" fill="#D6D3D0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="13" font-weight="500" letter-spacing="3" text-anchor="middle">30 AUG</text>
+  <!-- Live Clock Preview Card (Right) -->
+  <g transform="translate(900, 95)" filter="url(#cardShadow)">
+    <rect x="0" y="0" width="240" height="250" rx="16" fill="#12161E" stroke="#252D3D" stroke-width="1.5"/>
+    <rect x="0" y="0" width="240" height="4" rx="2" fill="url(#cyanGrad)"/>
+    <text x="120" y="55" fill="#7E8B9E" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="11" font-weight="700" letter-spacing="2" text-anchor="middle">GOOD EVENING</text>
+    <text x="120" y="94" fill="#00F0FF" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="19" font-weight="700" letter-spacing="0.5" text-anchor="middle">Sunday</text>
+    <text x="120" y="156" fill="#FFFFFF" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', monospace" font-size="42" font-weight="800" letter-spacing="-1" text-anchor="middle">09:26</text>
+    <text x="120" y="196" fill="#CBD5E1" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14" font-weight="600" letter-spacing="3" text-anchor="middle">30 AUG</text>
+    <text x="120" y="228" fill="#00F0FF" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="10" font-weight="700" letter-spacing="1.5" text-anchor="middle">◆ SYSTEM READY ◆</text>
   </g>
 </svg>
