@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -1482,7 +1482,10 @@ namespace DesktopClock
         private bool _isClosing = false;
         private bool _applyingAnchorPosition = false;
         private HwndSource _hwndSource;
-        private NotifyIcon _trayIcon;
+        private static NotifyIcon _trayIcon;
+        private static System.Drawing.Icon _trayAppIcon;
+        private static ToolStripMenuItem _trayItemEdit;
+        private static string _trayIconSourceUsed = "";
         private DispatcherTimer _timeTimer;
         private DispatcherTimer _effectAnimationTimer;
 
@@ -2014,7 +2017,7 @@ namespace DesktopClock
             _timeTimer.Tick += TimeTimer_Tick;
             _timeTimer.Start();
 
-            Dispatcher.BeginInvoke(new Action(CreateTrayIcon), DispatcherPriority.Background);
+            CreateTrayIcon();
 
             _root.MouseLeftButtonDown += Widget_MouseLeftButtonDown;
             _root.MouseRightButtonDown += Widget_MouseRightButtonDown;
@@ -2341,22 +2344,34 @@ namespace DesktopClock
 
         private static uint _wmTaskbarCreated = 0;
 
-        private void CreateTrayIcon()
+        public static void LogTrayDebug(string msg)
         {
             try
             {
-                if (_trayIcon != null)
+                string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DesktopClock");
+                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                string file = Path.Combine(dir, "tray-debug.log");
+                string line = string.Format("[{0:yyyy-MM-dd HH:mm:ss.fff}] {1}\r\n", DateTime.Now, msg);
+                File.AppendAllText(file, line);
+            }
+            catch { }
+        }
+
+        private void CreateTrayIcon()
+        {
+            LogTrayDebug("CreateTrayIcon entered");
+            try
+            {
+                if (_trayIcon == null)
                 {
-                    try { _trayIcon.Visible = false; _trayIcon.Dispose(); } catch { }
-                    _trayIcon = null;
+                    _trayIcon = new NotifyIcon();
+                    LogTrayDebug("NotifyIcon constructed");
                 }
 
-                _trayIcon = new NotifyIcon
-                {
-                    Text = "DesktopClock Widget",
-                    Icon = GenerateClockIcon(),
-                    Visible = true
-                };
+                _trayAppIcon = LoadOfficialIcon();
+                _trayIcon.Icon = _trayAppIcon;
+                _trayIcon.Text = "DesktopClock Widget";
+                LogTrayDebug("Icon and Text assigned. Source: " + _trayIconSourceUsed);
 
                 var menu = new ContextMenuStrip();
                 var headerItem = new ToolStripMenuItem("DesktopClock Widget")
@@ -2365,7 +2380,7 @@ namespace DesktopClock
                     Font = new System.Drawing.Font(System.Drawing.SystemFonts.DefaultFont, System.Drawing.FontStyle.Bold)
                 };
                 var itemSep0 = new ToolStripSeparator();
-                var itemEdit = new ToolStripMenuItem(_editing ? "Lock Position (Ctrl+Alt+C)" : "Edit Position (Ctrl+Alt+C)", null, (s, e) => SetEditing(!_editing));
+                _trayItemEdit = new ToolStripMenuItem(_editing ? "Lock Position (Ctrl+Alt+C)" : "Edit Position (Ctrl+Alt+C)", null, (s, e) => SetEditing(!_editing));
                 var itemCenter = new ToolStripMenuItem("Center on Screen", null, (s, e) => { CenterOnScreen(); SaveSettings(); });
                 var itemSettings = new ToolStripMenuItem("Settings...", null, (s, e) => ShowSettings());
                 var itemSep1 = new ToolStripSeparator();
@@ -2373,30 +2388,38 @@ namespace DesktopClock
 
                 menu.Items.Add(headerItem);
                 menu.Items.Add(itemSep0);
-                menu.Items.Add(itemEdit);
+                menu.Items.Add(_trayItemEdit);
                 menu.Items.Add(itemCenter);
                 menu.Items.Add(itemSettings);
                 menu.Items.Add(itemSep1);
                 menu.Items.Add(itemExit);
 
                 _trayIcon.ContextMenuStrip = menu;
-                _trayIcon.DoubleClick += (s, e) => ShowSettings();
+                _trayIcon.DoubleClick -= TrayIcon_DoubleClick;
+                _trayIcon.DoubleClick += TrayIcon_DoubleClick;
+                LogTrayDebug("ContextMenuStrip assigned");
+
+                _trayIcon.Visible = false;
+                _trayIcon.Visible = true;
+                LogTrayDebug("Visible=true executed successfully");
             }
-            catch { }
+            catch (Exception ex)
+            {
+                LogTrayDebug("CreateTrayIcon EXCEPTION: " + ex.ToString());
+            }
+        }
+
+        private void TrayIcon_DoubleClick(object sender, EventArgs e)
+        {
+            ShowSettings();
         }
 
         private void SyncTrayItems()
         {
-            if (_trayIcon == null || _trayIcon.ContextMenuStrip == null) return;
-            try
+            if (_trayItemEdit != null)
             {
-                var item = _trayIcon.ContextMenuStrip.Items[0] as ToolStripMenuItem;
-                if (item != null)
-                {
-                    item.Text = _editing ? "Lock Position (Ctrl+Alt+C)" : "Edit Position (Ctrl+Alt+C)";
-                }
+                _trayItemEdit.Text = _editing ? "Lock Position (Ctrl+Alt+C)" : "Edit Position (Ctrl+Alt+C)";
             }
-            catch { }
         }
 
         private SettingsWindow _openSettingsWindow;
@@ -2422,7 +2445,7 @@ namespace DesktopClock
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         private static extern bool DestroyIcon(IntPtr handle);
 
-        private static System.Drawing.Icon GenerateClockIcon()
+        private static System.Drawing.Icon LoadOfficialIcon()
         {
             try
             {
@@ -2430,10 +2453,25 @@ namespace DesktopClock
                 string icoPath = System.IO.Path.Combine(baseDir, "app.ico");
                 if (System.IO.File.Exists(icoPath))
                 {
+                    _trayIconSourceUsed = "External app.ico (" + icoPath + ")";
                     return new System.Drawing.Icon(icoPath, 32, 32);
                 }
 
-                // High-precision programmatic rendering of official cyber clock logo
+                string fallbackIco = @"D:\AI\DesktopClockWidget\app.ico";
+                if (System.IO.File.Exists(fallbackIco))
+                {
+                    _trayIconSourceUsed = "External app.ico (" + fallbackIco + ")";
+                    return new System.Drawing.Icon(fallbackIco, 32, 32);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogTrayDebug("LoadOfficialIcon external file exception: " + ex.Message);
+            }
+
+            try
+            {
+                _trayIconSourceUsed = "Programmatic fallback";
                 using (var bmp = new System.Drawing.Bitmap(32, 32))
                 {
                     using (var g = System.Drawing.Graphics.FromImage(bmp))
@@ -2490,8 +2528,10 @@ namespace DesktopClock
                     return icon;
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                LogTrayDebug("LoadOfficialIcon programmatic fallback exception: " + ex.Message);
+                _trayIconSourceUsed = "System fallback";
                 return System.Drawing.SystemIcons.Application;
             }
         }
@@ -2554,6 +2594,11 @@ namespace DesktopClock
         [STAThread]
         public static void Main()
         {
+            AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+            {
+                ClockWindow.LogTrayDebug("CRITICAL UNHANDLED EXCEPTION: " + (e.ExceptionObject != null ? e.ExceptionObject.ToString() : "null"));
+            };
+
             string[] args = Environment.GetCommandLineArgs();
             for (int i = 1; i < args.Length; i++)
             {
@@ -2581,6 +2626,10 @@ namespace DesktopClock
             if (!createdNew) return;
 
             var app = new App();
+            app.DispatcherUnhandledException += (s, e) =>
+            {
+                ClockWindow.LogTrayDebug("CRITICAL DISPATCHER EXCEPTION: " + e.Exception.ToString());
+            };
             _mainWindow = new ClockWindow();
             app.Run(_mainWindow);
         }
