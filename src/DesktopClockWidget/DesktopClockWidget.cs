@@ -1385,6 +1385,130 @@ namespace DesktopClock
         }
     }
 
+    public class StableElementMetrics
+    {
+        public double Width { get; set; }
+        public double Height { get; set; }
+
+        public StableElementMetrics() { }
+        public StableElementMetrics(double w, double h)
+        {
+            Width = w;
+            Height = h;
+        }
+    }
+
+    public static class DynamicEnvelopeHelper
+    {
+        public static StableElementMetrics ComputeEnvelope(FontFamily family, FontWeight weight, double size, TextEffectSettings effects, string textCase, IEnumerable<string> candidates)
+        {
+            if (candidates == null) return null;
+
+            double maxW = 0.0;
+            double maxH = 0.0;
+            double strokePad = (effects != null && effects.OutlineEnabled) ? Math.Min(10, effects.OutlineThickness) : 0;
+            var tf = new Typeface(family ?? SystemFonts.MessageFontFamily, FontStyles.Normal, weight, FontStretches.Normal);
+            var brush = Brushes.Black;
+
+            foreach (var rawStr in candidates)
+            {
+                if (string.IsNullOrEmpty(rawStr)) continue;
+                string s = rawStr;
+                if (string.Equals(textCase, "Upper", StringComparison.OrdinalIgnoreCase)) s = s.ToUpperInvariant();
+                else if (string.Equals(textCase, "Lower", StringComparison.OrdinalIgnoreCase)) s = s.ToLowerInvariant();
+                else if (string.Equals(textCase, "Title", StringComparison.OrdinalIgnoreCase)) s = TextCaseHelper.ApplyCase(s, "Title");
+
+                var ft = new FormattedText(s, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, tf, Math.Max(6, size), brush);
+                var g = ft.BuildGeometry(new Point(0, 0));
+                double w = (g != null && !g.Bounds.IsEmpty) ? g.Bounds.Width : ft.Width;
+                double h = (g != null && !g.Bounds.IsEmpty) ? g.Bounds.Height : ft.Height;
+
+                if (w > maxW) maxW = w;
+                if (h > maxH) maxH = h;
+            }
+
+            if (maxW <= 0) return null;
+            return new StableElementMetrics(Math.Ceiling(maxW + strokePad * 2), Math.Ceiling(maxH + strokePad * 2));
+        }
+
+        public static List<string> GetTimeCandidates(WidgetSettings settings)
+        {
+            var list = new List<string>();
+            var culture = CultureInfo.InvariantCulture;
+            
+            // Sample all 24 hours and all typical proportional digit variations
+            int[] hours = new int[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23 };
+            int[] minutes = new int[] { 0, 1, 8, 9, 10, 11, 19, 20, 28, 38, 48, 59 };
+
+            foreach (int h in hours)
+            {
+                foreach (int m in minutes)
+                {
+                    var dt = new DateTime(2026, 8, 30, h, m, 0);
+                    list.Add(dt.ToString("hh:mm tt", culture));
+                    list.Add(dt.ToString("h:mm tt", culture));
+                    list.Add(dt.ToString("HH:mm", culture));
+                    list.Add(dt.ToString("H:mm", culture));
+                    list.Add(dt.ToString("hh:mm:ss tt", culture));
+                    list.Add(dt.ToString("HH:mm:ss", culture));
+                }
+            }
+            return list;
+        }
+
+        public static List<string> GetWeekdayCandidates()
+        {
+            return new List<string>
+            {
+                "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+                "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"
+            };
+        }
+
+        public static List<string> GetDateCandidates(WidgetSettings settings)
+        {
+            var list = new List<string>();
+            var culture = CultureInfo.InvariantCulture;
+
+            string[] months = new string[] { "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
+                                             "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" };
+            int[] days = new int[] { 1, 8, 11, 18, 22, 28, 30, 31 };
+
+            for (int m = 1; m <= 12; m++)
+            {
+                foreach (int d in days)
+                {
+                    try
+                    {
+                        var dt = new DateTime(2026, m, Math.Min(d, DateTime.DaysInMonth(2026, m)));
+                        list.Add(dt.ToString("dd MMM", culture));
+                        list.Add(dt.ToString("d MMM", culture));
+                        list.Add(dt.ToString("dd MMMM", culture));
+                        list.Add(dt.ToString("MMM dd", culture));
+                        list.Add(dt.ToString("dd/MM/yyyy", culture));
+                        list.Add(dt.ToString("yyyy-MM-dd", culture));
+                    }
+                    catch { }
+                }
+            }
+            return list;
+        }
+
+        public static List<string> GetGreetingCandidates(WidgetSettings settings)
+        {
+            var list = new List<string>
+            {
+                "GOOD MORNING", "GOOD AFTERNOON", "GOOD EVENING", "GOOD NIGHT",
+                "Good Morning", "Good Afternoon", "Good Evening", "Good Night"
+            };
+            if (settings != null && !string.IsNullOrEmpty(settings.CustomGreeting))
+            {
+                list.Add(settings.CustomGreeting);
+            }
+            return list;
+        }
+    }
+
     public class EffectTextBlock : FrameworkElement
     {
         private string _text = "";
@@ -1399,6 +1523,21 @@ namespace DesktopClock
         private double _offsetY = 0.0;
         private bool _isSelectedForEdit = false;
         private TextEffectSettings _effects = new TextEffectSettings();
+        private StableElementMetrics _stableEnvelope;
+
+        public StableElementMetrics StableEnvelope
+        {
+            get { return _stableEnvelope; }
+            set
+            {
+                if (_stableEnvelope != value)
+                {
+                    _stableEnvelope = value;
+                    InvalidateMeasure();
+                    InvalidateVisual();
+                }
+            }
+        }
 
         private FormattedText _formattedText;
         private Geometry _cachedGeometry;
@@ -1630,15 +1769,20 @@ namespace DesktopClock
         protected override Size MeasureOverride(Size availableSize)
         {
             if (_formattedTextDirty || _geometryDirty) EnsureGeometry();
-            if (_formattedText == null || string.IsNullOrEmpty(_text))
+            if ((_formattedText == null || string.IsNullOrEmpty(_text)) && (_stableEnvelope == null || _stableEnvelope.Width <= 0))
                 return new Size(0, 0);
 
             double strokePad = 0;
             if (_effects != null && _effects.OutlineEnabled)
                 strokePad = Math.Min(10, _effects.OutlineThickness);
 
-            double baseW = (_visualBounds.IsEmpty ? _formattedText.Width : _visualBounds.Width) + strokePad * 2;
-            double baseH = (_visualBounds.IsEmpty ? _formattedText.Height : _visualBounds.Height) + strokePad * 2;
+            double baseW = _stableEnvelope != null && _stableEnvelope.Width > 0
+                ? _stableEnvelope.Width
+                : ((_visualBounds.IsEmpty ? (_formattedText != null ? _formattedText.Width : 0) : _visualBounds.Width) + strokePad * 2);
+
+            double baseH = _stableEnvelope != null && _stableEnvelope.Height > 0
+                ? _stableEnvelope.Height
+                : ((_visualBounds.IsEmpty ? (_formattedText != null ? _formattedText.Height : 0) : _visualBounds.Height) + strokePad * 2);
 
             // Layout-aware dynamic bounds expansion: accommodate configured X/Y offsets without clipping
             double extraLeft = Math.Max(0.0, -_offsetX);
@@ -2005,6 +2149,46 @@ namespace DesktopClock
             ApplyElementStyle(_dateText, _settings.Date, _settings.UseGlobalColor, _settings.GlobalColor, _settings.UseGlobalFont, _settings.GlobalFont, mo);
 
             ApplyCustomBlocks(mo);
+
+            // Compute Zero-Jitter Stable Layout Envelopes for all dynamic core elements
+            if (_timeText != null && _settings.Time != null && _settings.Time.Visible)
+            {
+                _timeText.StableEnvelope = DynamicEnvelopeHelper.ComputeEnvelope(_timeText.FontFamily, _timeText.FontWeight, _timeText.FontSize, _timeText.Effects, _settings.Time.Case, DynamicEnvelopeHelper.GetTimeCandidates(_settings));
+            }
+            if (_weekdayText != null && _settings.Weekday != null && _settings.Weekday.Visible)
+            {
+                _weekdayText.StableEnvelope = DynamicEnvelopeHelper.ComputeEnvelope(_weekdayText.FontFamily, _weekdayText.FontWeight, _weekdayText.FontSize, _weekdayText.Effects, _settings.Weekday.Case, DynamicEnvelopeHelper.GetWeekdayCandidates());
+            }
+            if (_dateText != null && _settings.Date != null && _settings.Date.Visible)
+            {
+                _dateText.StableEnvelope = DynamicEnvelopeHelper.ComputeEnvelope(_dateText.FontFamily, _dateText.FontWeight, _dateText.FontSize, _dateText.Effects, _settings.Date.Case, DynamicEnvelopeHelper.GetDateCandidates(_settings));
+            }
+            if (_greetingText != null && _settings.Greeting != null && _settings.Greeting.Visible)
+            {
+                _greetingText.StableEnvelope = DynamicEnvelopeHelper.ComputeEnvelope(_greetingText.FontFamily, _greetingText.FontWeight, _greetingText.FontSize, _greetingText.Effects, _settings.Greeting.Case, DynamicEnvelopeHelper.GetGreetingCandidates(_settings));
+            }
+
+            // Compute Stable Envelopes for rotating / scheduled custom blocks
+            if (_settings.Blocks != null)
+            {
+                foreach (var b in _settings.Blocks)
+                {
+                    if (b != null && b.Enabled && _customBlockElements.ContainsKey(b.Id))
+                    {
+                        var elem = _customBlockElements[b.Id];
+                        var candidates = new List<string>();
+                        if (b.Type == "Rotating Text" && b.Messages != null) candidates.AddRange(b.Messages);
+                        else if (b.Type == "Scheduled Messages" && b.ScheduledMessages != null)
+                        {
+                            foreach (var sm in b.ScheduledMessages) if (!string.IsNullOrEmpty(sm.Text)) candidates.Add(sm.Text);
+                        }
+                        if (candidates.Count > 0)
+                        {
+                            elem.StableEnvelope = DynamicEnvelopeHelper.ComputeEnvelope(elem.FontFamily, elem.FontWeight, elem.FontSize, elem.Effects, b.Case, candidates);
+                        }
+                    }
+                }
+            }
 
             ApplyGreeting();
             UpdateDateTime();
@@ -3544,6 +3728,108 @@ namespace DesktopClock
             // On cancel:
             sWorking = SettingsManager.Clone(sOriginal);
             Check(sb, ref ok, sWorking.Time.FontFamily == "Audiowide", "55. Cancel restores pre-opened font snapshot, Apply persists");
+
+            // PHASE 6: ZERO-VISUAL-JITTER STABLE LAYOUT ENVELOPE ACCEPTANCE TESTS
+            // 56. Time 2:39 PM -> 2:40 PM stable slot width test (0.0 DIP variance)
+            var tbTime = new EffectTextBlock { FontSize = 48.0, FontFamily = new FontFamily("Segoe UI") };
+            tbTime.StableEnvelope = DynamicEnvelopeHelper.ComputeEnvelope(tbTime.FontFamily, tbTime.FontWeight, tbTime.FontSize, tbTime.Effects, "Upper", DynamicEnvelopeHelper.GetTimeCandidates(new WidgetSettings()));
+            tbTime.Text = "02:39 PM";
+            tbTime.Measure(new Size(800, 800));
+            double w239 = tbTime.DesiredSize.Width;
+            double h239 = tbTime.DesiredSize.Height;
+            tbTime.Text = "02:40 PM";
+            tbTime.Measure(new Size(800, 800));
+            double w240 = tbTime.DesiredSize.Width;
+            double h240 = tbTime.DesiredSize.Height;
+            Check(sb, ref ok, Math.Abs(w239 - w240) < 0.001 && Math.Abs(h239 - h240) < 0.001, "56. Time 2:39 PM -> 2:40 PM stable slot width test (w: " + w239.ToString("F1") + " vs " + w240.ToString("F1") + " DIP, delta: " + Math.Abs(w239 - w240).ToString("F3") + ")");
+
+            // 57. Time 9:59 PM -> 10:00 PM stable slot width test (0.0 DIP variance)
+            tbTime.Text = "09:59 PM";
+            tbTime.Measure(new Size(800, 800));
+            double w959 = tbTime.DesiredSize.Width;
+            tbTime.Text = "10:00 PM";
+            tbTime.Measure(new Size(800, 800));
+            double w1000 = tbTime.DesiredSize.Width;
+            Check(sb, ref ok, Math.Abs(w959 - w1000) < 0.001, "57. Time 9:59 PM -> 10:00 PM stable slot width test (w: " + w959.ToString("F1") + " vs " + w1000.ToString("F1") + " DIP, delta: " + Math.Abs(w959 - w1000).ToString("F3") + ")");
+
+            // 58. All 7 weekdays stable slot test (Monday..Sunday, 0.0 DIP variance)
+            var tbWk = new EffectTextBlock { FontSize = 22.0, FontFamily = new FontFamily("Segoe UI") };
+            tbWk.StableEnvelope = DynamicEnvelopeHelper.ComputeEnvelope(tbWk.FontFamily, tbWk.FontWeight, tbWk.FontSize, tbWk.Effects, "Title", DynamicEnvelopeHelper.GetWeekdayCandidates());
+            double wSunday = 0;
+            bool wkPass = true;
+            string[] wks = new string[] { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" };
+            for (int i = 0; i < wks.Length; i++)
+            {
+                tbWk.Text = wks[i];
+                tbWk.Measure(new Size(800, 800));
+                if (i == 0) wSunday = tbWk.DesiredSize.Width;
+                else if (Math.Abs(tbWk.DesiredSize.Width - wSunday) > 0.001) wkPass = false;
+            }
+            Check(sb, ref ok, wkPass, "58. All 7 weekdays stable slot dimensions (w: " + wSunday.ToString("F1") + " DIP, delta: 0.000 across all 7 days)");
+
+            // 59. Representative dates test (01 JAN..31 DEC, 0.0 DIP variance)
+            var tbDt = new EffectTextBlock { FontSize = 18.0, FontFamily = new FontFamily("Segoe UI") };
+            tbDt.StableEnvelope = DynamicEnvelopeHelper.ComputeEnvelope(tbDt.FontFamily, tbDt.FontWeight, tbDt.FontSize, tbDt.Effects, "Upper", DynamicEnvelopeHelper.GetDateCandidates(new WidgetSettings()));
+            double wJan = 0;
+            bool dtPass = true;
+            string[] sampleDates = new string[] { "01 JAN", "11 JAN", "28 FEB", "30 AUG", "01 SEP", "11 SEP", "30 SEP", "31 DEC" };
+            for (int i = 0; i < sampleDates.Length; i++)
+            {
+                tbDt.Text = sampleDates[i];
+                tbDt.Measure(new Size(800, 800));
+                if (i == 0) wJan = tbDt.DesiredSize.Width;
+                else if (Math.Abs(tbDt.DesiredSize.Width - wJan) > 0.001) dtPass = false;
+            }
+            Check(sb, ref ok, dtPass, "59. Representative dates stable slot dimensions (w: " + wJan.ToString("F1") + " DIP, delta: 0.000 across 8 months)");
+
+            // 60. All greetings test (Good Morning..Good Night, 0.0 DIP variance)
+            var tbGr = new EffectTextBlock { FontSize = 16.0, FontFamily = new FontFamily("Segoe UI") };
+            tbGr.StableEnvelope = DynamicEnvelopeHelper.ComputeEnvelope(tbGr.FontFamily, tbGr.FontWeight, tbGr.FontSize, tbGr.Effects, "Upper", DynamicEnvelopeHelper.GetGreetingCandidates(new WidgetSettings()));
+            double wGrBase = 0;
+            bool grPass = true;
+            string[] grs = new string[] { "GOOD MORNING", "GOOD AFTERNOON", "GOOD EVENING", "GOOD NIGHT" };
+            for (int i = 0; i < grs.Length; i++)
+            {
+                tbGr.Text = grs[i];
+                tbGr.Measure(new Size(800, 800));
+                if (i == 0) wGrBase = tbGr.DesiredSize.Width;
+                else if (Math.Abs(tbGr.DesiredSize.Width - wGrBase) > 0.001) grPass = false;
+            }
+            Check(sb, ref ok, grPass, "60. All greetings stable slot dimensions (w: " + wGrBase.ToString("F1") + " DIP, delta: 0.000 across all 4 greetings)");
+
+            // 61. Handwritten & proportional fonts jitter test (Caveat, Permanent Marker, Kalam, Cormorant Garamond, Playfair Display)
+            string[] propFonts = new string[] { "Caveat", "Permanent Marker", "Kalam", "Cormorant Garamond", "Playfair Display" };
+            bool propPass = true;
+            foreach (var pf in propFonts)
+            {
+                var ff = Fonts.For(pf);
+                var tbProp = new EffectTextBlock { FontSize = 36.0, FontFamily = ff };
+                tbProp.StableEnvelope = DynamicEnvelopeHelper.ComputeEnvelope(tbProp.FontFamily, tbProp.FontWeight, tbProp.FontSize, tbProp.Effects, "Upper", DynamicEnvelopeHelper.GetTimeCandidates(new WidgetSettings()));
+                tbProp.Text = "02:39 PM";
+                tbProp.Measure(new Size(800, 800));
+                double wA = tbProp.DesiredSize.Width;
+                tbProp.Text = "02:40 PM";
+                tbProp.Measure(new Size(800, 800));
+                double wB = tbProp.DesiredSize.Width;
+                if (Math.Abs(wA - wB) > 0.001) propPass = false;
+            }
+            Check(sb, ref ok, propPass, "61. Proportional/Handwritten fonts zero-jitter test (Caveat, Permanent Marker, Kalam, Cormorant Garamond, Playfair Display: 0.000 DIP variance)");
+
+            // 62. Rotating / scheduled custom block transition stability
+            var tbBlock = new EffectTextBlock { FontSize = 16.0, FontFamily = new FontFamily("Segoe UI") };
+            var blockMessages = new List<string> { "FOCUS", "KEEP GOING", "YOU ARE DOING GREAT", "STAY HYDRATED" };
+            tbBlock.StableEnvelope = DynamicEnvelopeHelper.ComputeEnvelope(tbBlock.FontFamily, tbBlock.FontWeight, tbBlock.FontSize, tbBlock.Effects, "Upper", blockMessages);
+            double wBlkBase = 0;
+            bool blkPass = true;
+            for (int i = 0; i < blockMessages.Count; i++)
+            {
+                tbBlock.Text = blockMessages[i];
+                tbBlock.Measure(new Size(800, 800));
+                if (i == 0) wBlkBase = tbBlock.DesiredSize.Width;
+                else if (Math.Abs(tbBlock.DesiredSize.Width - wBlkBase) > 0.001) blkPass = false;
+            }
+            Check(sb, ref ok, blkPass, "62. Rotating/Scheduled custom block transition stability (w: " + wBlkBase.ToString("F1") + " DIP, delta: 0.000 across varied message lengths)");
+
 
             sb.AppendLine("RESULT: " + (ok ? "PASS" : "FAIL"));
             string res = sb.ToString();
