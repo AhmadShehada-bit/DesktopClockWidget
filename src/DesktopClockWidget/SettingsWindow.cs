@@ -19,6 +19,10 @@ using Orientation = System.Windows.Controls.Orientation;
 using Rectangle = System.Windows.Shapes.Rectangle;
 using TabControl = System.Windows.Controls.TabControl;
 using TextBox = System.Windows.Controls.TextBox;
+using KeyEventArgs = System.Windows.Input.KeyEventArgs;
+using Key = System.Windows.Input.Key;
+using Keyboard = System.Windows.Input.Keyboard;
+using ModifierKeys = System.Windows.Input.ModifierKeys;
 
 namespace DesktopClock
 {
@@ -45,14 +49,23 @@ namespace DesktopClock
         private TextBox _txtEveningStart;
         private TextBox _txtNightStart;
 
+        private TabControl _tabs;
+
         // Core Elements Tab
         private ComboBox _cmbCoreElementSelector;
         private CheckBox _chkCoreElemVisible;
         private ComboBox _cmbCoreElemAlign;
+        private Button _btnCoreElemDecX;
         private TextBox _txtCoreElemOffsetX;
+        private Button _btnCoreElemIncX;
         private Slider _sliderCoreElemOffsetX;
+        private Button _btnCoreElemDecY;
         private TextBox _txtCoreElemOffsetY;
+        private Button _btnCoreElemIncY;
         private Slider _sliderCoreElemOffsetY;
+        private TextBlock _lblCoreElemPosReadout;
+        private CheckBox _chkCoreElemNudgeMode;
+        private TextBlock _lblCoreElemNudgeHelp;
         private ComboBox _cmbCoreElemSource;
         private ComboBox _cmbCoreElemCategory;
         private TextBox _txtCoreElemFontSearch;
@@ -144,10 +157,17 @@ namespace DesktopClock
         private Slider _sliderBlockOpacity;
         private TextBlock _lblBlockOpacity;
         private ComboBox _cmbBlockAlignment;
+        private Button _btnBlockDecX;
         private TextBox _txtBlockOffsetX;
+        private Button _btnBlockIncX;
         private Slider _sliderBlockOffsetX;
+        private Button _btnBlockDecY;
         private TextBox _txtBlockOffsetY;
+        private Button _btnBlockIncY;
         private Slider _sliderBlockOffsetY;
+        private TextBlock _lblBlockPosReadout;
+        private CheckBox _chkBlockNudgeMode;
+        private TextBlock _lblBlockNudgeHelp;
         private ComboBox _cmbBlockCase;
         private CheckBox _chkBlockItalic;
         private CheckBox _chkBlockUnderline;
@@ -218,12 +238,14 @@ namespace DesktopClock
             mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-            var tabs = new TabControl
+            _tabs = new TabControl
             {
                 Background = new SolidColorBrush(Color.FromRgb(36, 38, 42)),
                 BorderBrush = new SolidColorBrush(Color.FromRgb(50, 52, 58)),
                 Margin = new Thickness(10)
             };
+            var tabs = _tabs;
+            _tabs.SelectionChanged += (s, e) => { UpdateElementHighlight(); };
 
             var tabGeneral = new TabItem { Header = "  GENERAL  " };
             tabGeneral.Content = CreateGeneralTab();
@@ -285,8 +307,10 @@ namespace DesktopClock
             mainGrid.Children.Add(bottomBar);
 
             Content = mainGrid;
+            PreviewKeyDown += SettingsWindow_PreviewKeyDown;
             Closing += (s, e) =>
             {
+                _host.SetElementEditingHighlight(null);
                 if (!_applied) _host.ApplyPreview(_original);
             };
         }
@@ -541,7 +565,7 @@ namespace DesktopClock
             };
             fontRow.Children.Add(_cmbCoreElemFont);
 
-            _btnCoreElemFontFav = CreateStyledButton("â˜†", 36);
+            _btnCoreElemFontFav = CreateStyledButton("\u2606", 36);
             _btnCoreElemFontFav.Click += (s, e) =>
             {
                 var elem = GetSelectedCoreElement();
@@ -680,12 +704,12 @@ namespace DesktopClock
             root.Children.Add(grp);
 
             // POSITION & ALIGNMENT SECTION
-            var grpPos = CreateGroupBox("Position & Alignment");
+            var grpPos = CreateGroupBox("Position & Alignment (Precision Nudge)");
             var stackPos = new StackPanel { Margin = new Thickness(8) };
 
             var alignRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
-            alignRow.Children.Add(new TextBlock { Text = "Horizontal:", Width = 110, VerticalAlignment = VerticalAlignment.Center });
-            _cmbCoreElemAlign = CreateComboBox(140);
+            alignRow.Children.Add(new TextBlock { Text = "Horizontal:", Width = 100, VerticalAlignment = VerticalAlignment.Center });
+            _cmbCoreElemAlign = CreateComboBox(120);
             _cmbCoreElemAlign.Items.Add("Left");
             _cmbCoreElemAlign.Items.Add("Center");
             _cmbCoreElemAlign.Items.Add("Right");
@@ -698,58 +722,185 @@ namespace DesktopClock
             alignRow.Children.Add(_cmbCoreElemAlign);
             stackPos.Children.Add(alignRow);
 
+            // X Offset Precision Controls
             var xRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
-            xRow.Children.Add(new TextBlock { Text = "X Offset (DIP):", Width = 110, VerticalAlignment = VerticalAlignment.Center });
-            _txtCoreElemOffsetX = CreateTextBox(45);
+            xRow.Children.Add(new TextBlock { Text = "X Offset (DIP):", Width = 100, VerticalAlignment = VerticalAlignment.Center });
+
+            _btnCoreElemDecX = CreateStyledButton("-", 26);
+            _btnCoreElemDecX.Click += (s, e) =>
+            {
+                double step = (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? 0.5 : ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? 10.0 : 1.0);
+                NudgeCoreElement(-step, 0);
+            };
+            xRow.Children.Add(_btnCoreElemDecX);
+
+            _txtCoreElemOffsetX = CreateTextBox(48);
+            _txtCoreElemOffsetX.Margin = new Thickness(4, 0, 4, 0);
             _txtCoreElemOffsetX.TextChanged += (s, e) =>
             {
                 if (_isUpdatingUi) return;
                 double val;
-                if (double.TryParse(_txtCoreElemOffsetX.Text, out val) && val >= -120 && val <= 120)
+                if (double.TryParse(_txtCoreElemOffsetX.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out val) || double.TryParse(_txtCoreElemOffsetX.Text, out val))
                 {
-                    var elem = GetSelectedCoreElement();
-                    if (elem != null) { elem.OffsetX = val; _sliderCoreElemOffsetX.Value = val; ApplyPreviewLive(); }
+                    if (val >= -120 && val <= 120)
+                    {
+                        var elem = GetSelectedCoreElement();
+                        if (elem != null)
+                        {
+                            elem.OffsetX = val;
+                            _sliderCoreElemOffsetX.Value = val;
+                            UpdateCorePosReadout();
+                            ApplyPreviewLive();
+                        }
+                    }
                 }
             };
             xRow.Children.Add(_txtCoreElemOffsetX);
-            _sliderCoreElemOffsetX = new Slider { Minimum = -120, Maximum = 120, Value = 0, Width = 160, Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+
+            _btnCoreElemIncX = CreateStyledButton("+", 26);
+            _btnCoreElemIncX.Click += (s, e) =>
+            {
+                double step = (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? 0.5 : ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? 10.0 : 1.0);
+                NudgeCoreElement(step, 0);
+            };
+            xRow.Children.Add(_btnCoreElemIncX);
+
+            _sliderCoreElemOffsetX = new Slider { Minimum = -120, Maximum = 120, Value = 0, Width = 120, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
             _sliderCoreElemOffsetX.ValueChanged += (s, e) =>
             {
                 if (_isUpdatingUi) return;
-                double val = Math.Round(_sliderCoreElemOffsetX.Value);
+                double val = Math.Round(_sliderCoreElemOffsetX.Value * 2.0) / 2.0;
                 var elem = GetSelectedCoreElement();
-                if (elem != null) { elem.OffsetX = val; _txtCoreElemOffsetX.Text = val.ToString(); ApplyPreviewLive(); }
+                if (elem != null)
+                {
+                    elem.OffsetX = val;
+                    _txtCoreElemOffsetX.Text = val.ToString("0.0", CultureInfo.InvariantCulture);
+                    UpdateCorePosReadout();
+                    ApplyPreviewLive();
+                }
             };
             xRow.Children.Add(_sliderCoreElemOffsetX);
             stackPos.Children.Add(xRow);
 
+            // Y Offset Precision Controls
             var yRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
-            yRow.Children.Add(new TextBlock { Text = "Y Offset (DIP):", Width = 110, VerticalAlignment = VerticalAlignment.Center });
-            _txtCoreElemOffsetY = CreateTextBox(45);
+            yRow.Children.Add(new TextBlock { Text = "Y Offset (DIP):", Width = 100, VerticalAlignment = VerticalAlignment.Center });
+
+            _btnCoreElemDecY = CreateStyledButton("-", 26);
+            _btnCoreElemDecY.Click += (s, e) =>
+            {
+                double step = (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? 0.5 : ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? 10.0 : 1.0);
+                NudgeCoreElement(0, -step);
+            };
+            yRow.Children.Add(_btnCoreElemDecY);
+
+            _txtCoreElemOffsetY = CreateTextBox(48);
+            _txtCoreElemOffsetY.Margin = new Thickness(4, 0, 4, 0);
             _txtCoreElemOffsetY.TextChanged += (s, e) =>
             {
                 if (_isUpdatingUi) return;
                 double val;
-                if (double.TryParse(_txtCoreElemOffsetY.Text, out val) && val >= -80 && val <= 80)
+                if (double.TryParse(_txtCoreElemOffsetY.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out val) || double.TryParse(_txtCoreElemOffsetY.Text, out val))
                 {
-                    var elem = GetSelectedCoreElement();
-                    if (elem != null) { elem.OffsetY = val; _sliderCoreElemOffsetY.Value = val; ApplyPreviewLive(); }
+                    if (val >= -80 && val <= 80)
+                    {
+                        var elem = GetSelectedCoreElement();
+                        if (elem != null)
+                        {
+                            elem.OffsetY = val;
+                            _sliderCoreElemOffsetY.Value = val;
+                            UpdateCorePosReadout();
+                            ApplyPreviewLive();
+                        }
+                    }
                 }
             };
             yRow.Children.Add(_txtCoreElemOffsetY);
-            _sliderCoreElemOffsetY = new Slider { Minimum = -80, Maximum = 80, Value = 0, Width = 160, Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+
+            _btnCoreElemIncY = CreateStyledButton("+", 26);
+            _btnCoreElemIncY.Click += (s, e) =>
+            {
+                double step = (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? 0.5 : ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? 10.0 : 1.0);
+                NudgeCoreElement(0, step);
+            };
+            yRow.Children.Add(_btnCoreElemIncY);
+
+            _sliderCoreElemOffsetY = new Slider { Minimum = -80, Maximum = 80, Value = 0, Width = 120, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
             _sliderCoreElemOffsetY.ValueChanged += (s, e) =>
             {
                 if (_isUpdatingUi) return;
-                double val = Math.Round(_sliderCoreElemOffsetY.Value);
+                double val = Math.Round(_sliderCoreElemOffsetY.Value * 2.0) / 2.0;
                 var elem = GetSelectedCoreElement();
-                if (elem != null) { elem.OffsetY = val; _txtCoreElemOffsetY.Text = val.ToString(); ApplyPreviewLive(); }
+                if (elem != null)
+                {
+                    elem.OffsetY = val;
+                    _txtCoreElemOffsetY.Text = val.ToString("0.0", CultureInfo.InvariantCulture);
+                    UpdateCorePosReadout();
+                    ApplyPreviewLive();
+                }
             };
             yRow.Children.Add(_sliderCoreElemOffsetY);
             stackPos.Children.Add(yRow);
 
-            var btnResetPos = CreateStyledButton("Reset Position", 120);
-            btnResetPos.Margin = new Thickness(110, 4, 0, 0);
+            // Live Readout Row
+            _lblCoreElemPosReadout = new TextBlock
+            {
+                Text = "Current Position: X: +0.0 DIP  |  Y: +0.0 DIP",
+                Foreground = new SolidColorBrush(Color.FromRgb(0, 220, 255)),
+                FontWeight = FontWeights.SemiBold,
+                FontSize = 11,
+                Margin = new Thickness(100, 0, 0, 8)
+            };
+            stackPos.Children.Add(_lblCoreElemPosReadout);
+
+            // Centering and Snap Quick Action Buttons
+            var btnRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
+            var btnCenterX = CreateStyledButton("Center X", 70);
+            btnCenterX.Click += (s, e) =>
+            {
+                var elem = GetSelectedCoreElement();
+                if (elem != null)
+                {
+                    elem.HorizontalAlignment = "Center";
+                    elem.OffsetX = 0.0;
+                    LoadSelectedCoreElementValues();
+                    ApplyPreviewLive();
+                }
+            };
+            btnRow.Children.Add(btnCenterX);
+
+            var btnResetY = CreateStyledButton("Reset Y", 65);
+            btnResetY.Margin = new Thickness(6, 0, 0, 0);
+            btnResetY.Click += (s, e) =>
+            {
+                var elem = GetSelectedCoreElement();
+                if (elem != null)
+                {
+                    elem.OffsetY = 0.0;
+                    LoadSelectedCoreElementValues();
+                    ApplyPreviewLive();
+                }
+            };
+            btnRow.Children.Add(btnResetY);
+
+            var btnSnapCenter = CreateStyledButton("Snap Center", 85);
+            btnSnapCenter.Margin = new Thickness(6, 0, 0, 0);
+            btnSnapCenter.Click += (s, e) =>
+            {
+                var elem = GetSelectedCoreElement();
+                if (elem != null)
+                {
+                    elem.HorizontalAlignment = "Center";
+                    elem.OffsetX = 0.0;
+                    elem.OffsetY = 0.0;
+                    LoadSelectedCoreElementValues();
+                    ApplyPreviewLive();
+                }
+            };
+            btnRow.Children.Add(btnSnapCenter);
+
+            var btnResetPos = CreateStyledButton("Reset All", 75);
+            btnResetPos.Margin = new Thickness(6, 0, 0, 0);
             btnResetPos.Click += (s, e) =>
             {
                 var elem = GetSelectedCoreElement();
@@ -762,7 +913,31 @@ namespace DesktopClock
                     ApplyPreviewLive();
                 }
             };
-            stackPos.Children.Add(btnResetPos);
+            btnRow.Children.Add(btnResetPos);
+            stackPos.Children.Add(btnRow);
+
+            // Dedicated Keyboard Nudge Mode Toggle
+            _chkCoreElemNudgeMode = new CheckBox
+            {
+                Content = "Enable Keyboard Nudge Mode (\u2190 \u2191 \u2192 \u2193)",
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Brushes.White,
+                Margin = new Thickness(0, 4, 0, 2)
+            };
+            _chkCoreElemNudgeMode.Click += (s, e) =>
+            {
+                UpdateElementHighlight();
+            };
+            stackPos.Children.Add(_chkCoreElemNudgeMode);
+
+            _lblCoreElemNudgeHelp = new TextBlock
+            {
+                Text = "Keyboard: Arrow Keys = 1 DIP  |  Ctrl+Arrow = 0.5 DIP  |  Shift+Arrow = 10 DIP",
+                Foreground = Brushes.Gray,
+                FontSize = 10.5,
+                Margin = new Thickness(20, 0, 0, 4)
+            };
+            stackPos.Children.Add(_lblCoreElemNudgeHelp);
 
             grpPos.Content = stackPos;
             root.Children.Add(grpPos);
@@ -1187,7 +1362,7 @@ namespace DesktopClock
             var elem = GetSelectedCoreElement();
             if (elem == null || string.IsNullOrEmpty(elem.FontFamily)) return;
             bool isFav = _preview.FavoriteFonts.Contains(elem.FontFamily);
-            _btnCoreElemFontFav.Content = isFav ? "â˜…" : "â˜†";
+            _btnCoreElemFontFav.Content = isFav ? "\u2605" : "\u2606";
             _btnCoreElemFontFav.Foreground = isFav ? Brushes.Gold : Brushes.White;
         }
 
@@ -1215,6 +1390,144 @@ namespace DesktopClock
             }
         }
 
+        private void NudgeCoreElement(double dx, double dy)
+        {
+            var elem = GetSelectedCoreElement();
+            if (elem == null) return;
+            elem.OffsetX = Math.Max(-120.0, Math.Min(120.0, elem.OffsetX + dx));
+            elem.OffsetY = Math.Max(-80.0, Math.Min(80.0, elem.OffsetY + dy));
+
+            _isUpdatingUi = true;
+            try
+            {
+                _txtCoreElemOffsetX.Text = elem.OffsetX.ToString("0.0", CultureInfo.InvariantCulture);
+                _sliderCoreElemOffsetX.Value = elem.OffsetX;
+                _txtCoreElemOffsetY.Text = elem.OffsetY.ToString("0.0", CultureInfo.InvariantCulture);
+                _sliderCoreElemOffsetY.Value = elem.OffsetY;
+                UpdateCorePosReadout();
+            }
+            finally
+            {
+                _isUpdatingUi = false;
+            }
+            ApplyPreviewLive();
+        }
+
+        private void NudgeCustomBlock(double dx, double dy)
+        {
+            var b = GetSelectedBlock();
+            if (b == null) return;
+            b.OffsetX = Math.Max(-120.0, Math.Min(120.0, b.OffsetX + dx));
+            b.OffsetY = Math.Max(-80.0, Math.Min(80.0, b.OffsetY + dy));
+
+            _isUpdatingUi = true;
+            try
+            {
+                _txtBlockOffsetX.Text = b.OffsetX.ToString("0.0", CultureInfo.InvariantCulture);
+                _sliderBlockOffsetX.Value = b.OffsetX;
+                _txtBlockOffsetY.Text = b.OffsetY.ToString("0.0", CultureInfo.InvariantCulture);
+                _sliderBlockOffsetY.Value = b.OffsetY;
+                UpdateBlockPosReadout();
+            }
+            finally
+            {
+                _isUpdatingUi = false;
+            }
+            ApplyPreviewLive();
+        }
+
+        private void UpdateCorePosReadout()
+        {
+            if (_lblCoreElemPosReadout == null) return;
+            var elem = GetSelectedCoreElement();
+            if (elem == null) return;
+            string signX = elem.OffsetX >= 0 ? "+" : "";
+            string signY = elem.OffsetY >= 0 ? "+" : "";
+            _lblCoreElemPosReadout.Text = string.Format("Current Position: X: {0}{1:F1} DIP  |  Y: {2}{3:F1} DIP", signX, elem.OffsetX, signY, elem.OffsetY);
+        }
+
+        private void UpdateBlockPosReadout()
+        {
+            if (_lblBlockPosReadout == null) return;
+            var b = GetSelectedBlock();
+            if (b == null) return;
+            string signX = b.OffsetX >= 0 ? "+" : "";
+            string signY = b.OffsetY >= 0 ? "+" : "";
+            _lblBlockPosReadout.Text = string.Format("Position: X: {0}{1:F1} DIP  |  Y: {2}{3:F1} DIP", signX, b.OffsetX, signY, b.OffsetY);
+        }
+
+        private void UpdateElementHighlight()
+        {
+            if (_host == null) return;
+            if (_tabs != null && _tabs.SelectedIndex == 1 && _chkCoreElemNudgeMode != null && _chkCoreElemNudgeMode.IsChecked == true)
+            {
+                string key = "Time";
+                if (_cmbCoreElementSelector != null)
+                {
+                    switch (_cmbCoreElementSelector.SelectedIndex)
+                    {
+                        case 0: key = "Greeting"; break;
+                        case 1: key = "Weekday"; break;
+                        case 2: key = "Time"; break;
+                        case 3: key = "Date"; break;
+                    }
+                }
+                _host.SetElementEditingHighlight(key);
+            }
+            else if (_tabs != null && _tabs.SelectedIndex == 2 && _chkBlockNudgeMode != null && _chkBlockNudgeMode.IsChecked == true)
+            {
+                var b = GetSelectedBlock();
+                _host.SetElementEditingHighlight(b != null ? b.Id : null);
+            }
+            else
+            {
+                _host.SetElementEditingHighlight(null);
+            }
+        }
+
+        private void SettingsWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            var focused = Keyboard.FocusedElement as DependencyObject;
+            if (focused is TextBox || focused is ComboBox || focused is Slider || focused is ListBox)
+            {
+                return;
+            }
+
+            bool isCoreActive = (_tabs != null && _tabs.SelectedIndex == 1 && _chkCoreElemNudgeMode != null && _chkCoreElemNudgeMode.IsChecked == true);
+            bool isBlockActive = (_tabs != null && _tabs.SelectedIndex == 2 && _chkBlockNudgeMode != null && _chkBlockNudgeMode.IsChecked == true);
+
+            if (!isCoreActive && !isBlockActive) return;
+
+            double step = 1.0;
+            if ((Keyboard.Modifiers & ModifierKeys.Control) != 0) step = 0.5;
+            else if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0) step = 10.0;
+
+            if (e.Key == Key.Left)
+            {
+                if (isCoreActive) NudgeCoreElement(-step, 0);
+                else if (isBlockActive) NudgeCustomBlock(-step, 0);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Right)
+            {
+                if (isCoreActive) NudgeCoreElement(step, 0);
+                else if (isBlockActive) NudgeCustomBlock(step, 0);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Up)
+            {
+                if (isCoreActive) NudgeCoreElement(0, -step);
+                else if (isBlockActive) NudgeCustomBlock(0, -step);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Down)
+            {
+                if (isCoreActive) NudgeCoreElement(0, step);
+                else if (isBlockActive) NudgeCustomBlock(0, step);
+                e.Handled = true;
+            }
+        }
+
         private void LoadSelectedCoreElementValues()
         {
             _isUpdatingUi = true;
@@ -1238,10 +1551,12 @@ namespace DesktopClock
 
                 // Position & Alignment
                 _cmbCoreElemAlign.SelectedItem = !string.IsNullOrEmpty(elem.HorizontalAlignment) ? elem.HorizontalAlignment : "Center";
-                _txtCoreElemOffsetX.Text = elem.OffsetX.ToString();
+                _txtCoreElemOffsetX.Text = elem.OffsetX.ToString("0.0", CultureInfo.InvariantCulture);
                 _sliderCoreElemOffsetX.Value = elem.OffsetX;
-                _txtCoreElemOffsetY.Text = elem.OffsetY.ToString();
+                _txtCoreElemOffsetY.Text = elem.OffsetY.ToString("0.0", CultureInfo.InvariantCulture);
                 _sliderCoreElemOffsetY.Value = elem.OffsetY;
+                UpdateCorePosReadout();
+                UpdateElementHighlight();
 
                 // Effects
                 var fx = elem.Effects;
@@ -1329,7 +1644,7 @@ namespace DesktopClock
                 ApplyPreviewLive();
             };
 
-            _btnMoveUpBlock = CreateStyledButton("â–² Up", 65);
+            _btnMoveUpBlock = CreateStyledButton("\u2191 Up", 65);
             _btnMoveUpBlock.Click += (s, e) =>
             {
                 int idx = _lstBlocks.SelectedIndex;
@@ -1345,7 +1660,7 @@ namespace DesktopClock
                 }
             };
 
-            _btnMoveDownBlock = CreateStyledButton("â–¼ Down", 75);
+            _btnMoveDownBlock = CreateStyledButton("\u2193 Down", 75);
             _btnMoveDownBlock.Click += (s, e) =>
             {
                 int idx = _lstBlocks.SelectedIndex;
@@ -1660,7 +1975,7 @@ namespace DesktopClock
             };
             bFontRow.Children.Add(_cmbBlockFont);
 
-            _btnBlockFontFav = CreateStyledButton("â˜†", 34);
+            _btnBlockFontFav = CreateStyledButton("\u2606", 34);
             _btnBlockFontFav.Click += (s, e) =>
             {
                 var b = GetSelectedBlock();
@@ -1805,57 +2120,183 @@ namespace DesktopClock
             rowAc.Children.Add(_cmbBlockCase);
             appStack.Children.Add(rowAc);
 
+            // Block X Offset with - / + buttons
             var rowBx = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
             rowBx.Children.Add(new TextBlock { Text = "X Offset:", Width = 70, VerticalAlignment = VerticalAlignment.Center });
-            _txtBlockOffsetX = CreateTextBox(40);
+            _btnBlockDecX = CreateStyledButton("-", 24);
+            _btnBlockDecX.Click += (s, e) =>
+            {
+                double step = (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? 0.5 : ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? 10.0 : 1.0);
+                NudgeCustomBlock(-step, 0);
+            };
+            rowBx.Children.Add(_btnBlockDecX);
+
+            _txtBlockOffsetX = CreateTextBox(44);
+            _txtBlockOffsetX.Margin = new Thickness(3, 0, 3, 0);
             _txtBlockOffsetX.TextChanged += (s, e) =>
             {
                 if (_isUpdatingUi) return;
                 double val;
-                if (double.TryParse(_txtBlockOffsetX.Text, out val) && val >= -120 && val <= 120)
+                if (double.TryParse(_txtBlockOffsetX.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out val) || double.TryParse(_txtBlockOffsetX.Text, out val))
                 {
-                    var b = GetSelectedBlock();
-                    if (b != null) { b.OffsetX = val; _sliderBlockOffsetX.Value = val; ApplyPreviewLive(); }
+                    if (val >= -120 && val <= 120)
+                    {
+                        var b = GetSelectedBlock();
+                        if (b != null)
+                        {
+                            b.OffsetX = val;
+                            _sliderBlockOffsetX.Value = val;
+                            UpdateBlockPosReadout();
+                            ApplyPreviewLive();
+                        }
+                    }
                 }
             };
             rowBx.Children.Add(_txtBlockOffsetX);
-            _sliderBlockOffsetX = new Slider { Minimum = -120, Maximum = 120, Value = 0, Width = 110, Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+
+            _btnBlockIncX = CreateStyledButton("+", 24);
+            _btnBlockIncX.Click += (s, e) =>
+            {
+                double step = (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? 0.5 : ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? 10.0 : 1.0);
+                NudgeCustomBlock(step, 0);
+            };
+            rowBx.Children.Add(_btnBlockIncX);
+
+            _sliderBlockOffsetX = new Slider { Minimum = -120, Maximum = 120, Value = 0, Width = 90, Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
             _sliderBlockOffsetX.ValueChanged += (s, e) =>
             {
                 if (_isUpdatingUi) return;
-                double val = Math.Round(_sliderBlockOffsetX.Value);
+                double val = Math.Round(_sliderBlockOffsetX.Value * 2.0) / 2.0;
                 var b = GetSelectedBlock();
-                if (b != null) { b.OffsetX = val; _txtBlockOffsetX.Text = val.ToString(); ApplyPreviewLive(); }
+                if (b != null)
+                {
+                    b.OffsetX = val;
+                    _txtBlockOffsetX.Text = val.ToString("0.0", CultureInfo.InvariantCulture);
+                    UpdateBlockPosReadout();
+                    ApplyPreviewLive();
+                }
             };
             rowBx.Children.Add(_sliderBlockOffsetX);
             appStack.Children.Add(rowBx);
 
+            // Block Y Offset with - / + buttons
             var rowBy = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
             rowBy.Children.Add(new TextBlock { Text = "Y Offset:", Width = 70, VerticalAlignment = VerticalAlignment.Center });
-            _txtBlockOffsetY = CreateTextBox(40);
+            _btnBlockDecY = CreateStyledButton("-", 24);
+            _btnBlockDecY.Click += (s, e) =>
+            {
+                double step = (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? 0.5 : ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? 10.0 : 1.0);
+                NudgeCustomBlock(0, -step);
+            };
+            rowBy.Children.Add(_btnBlockDecY);
+
+            _txtBlockOffsetY = CreateTextBox(44);
+            _txtBlockOffsetY.Margin = new Thickness(3, 0, 3, 0);
             _txtBlockOffsetY.TextChanged += (s, e) =>
             {
                 if (_isUpdatingUi) return;
                 double val;
-                if (double.TryParse(_txtBlockOffsetY.Text, out val) && val >= -80 && val <= 80)
+                if (double.TryParse(_txtBlockOffsetY.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out val) || double.TryParse(_txtBlockOffsetY.Text, out val))
                 {
-                    var b = GetSelectedBlock();
-                    if (b != null) { b.OffsetY = val; _sliderBlockOffsetY.Value = val; ApplyPreviewLive(); }
+                    if (val >= -80 && val <= 80)
+                    {
+                        var b = GetSelectedBlock();
+                        if (b != null)
+                        {
+                            b.OffsetY = val;
+                            _sliderBlockOffsetY.Value = val;
+                            UpdateBlockPosReadout();
+                            ApplyPreviewLive();
+                        }
+                    }
                 }
             };
             rowBy.Children.Add(_txtBlockOffsetY);
-            _sliderBlockOffsetY = new Slider { Minimum = -80, Maximum = 80, Value = 0, Width = 110, Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+
+            _btnBlockIncY = CreateStyledButton("+", 24);
+            _btnBlockIncY.Click += (s, e) =>
+            {
+                double step = (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? 0.5 : ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? 10.0 : 1.0);
+                NudgeCustomBlock(0, step);
+            };
+            rowBy.Children.Add(_btnBlockIncY);
+
+            _sliderBlockOffsetY = new Slider { Minimum = -80, Maximum = 80, Value = 0, Width = 90, Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
             _sliderBlockOffsetY.ValueChanged += (s, e) =>
             {
                 if (_isUpdatingUi) return;
-                double val = Math.Round(_sliderBlockOffsetY.Value);
+                double val = Math.Round(_sliderBlockOffsetY.Value * 2.0) / 2.0;
                 var b = GetSelectedBlock();
-                if (b != null) { b.OffsetY = val; _txtBlockOffsetY.Text = val.ToString(); ApplyPreviewLive(); }
+                if (b != null)
+                {
+                    b.OffsetY = val;
+                    _txtBlockOffsetY.Text = val.ToString("0.0", CultureInfo.InvariantCulture);
+                    UpdateBlockPosReadout();
+                    ApplyPreviewLive();
+                }
             };
             rowBy.Children.Add(_sliderBlockOffsetY);
+            appStack.Children.Add(rowBy);
 
-            var btnResetBPos = CreateStyledButton("Reset Pos", 70);
-            btnResetBPos.Margin = new Thickness(8, 0, 0, 0);
+            // Block Live Readout
+            _lblBlockPosReadout = new TextBlock
+            {
+                Text = "Position: X: +0.0 DIP  |  Y: +0.0 DIP",
+                Foreground = new SolidColorBrush(Color.FromRgb(0, 220, 255)),
+                FontWeight = FontWeights.SemiBold,
+                FontSize = 11,
+                Margin = new Thickness(70, 0, 0, 6)
+            };
+            appStack.Children.Add(_lblBlockPosReadout);
+
+            // Block Centering Action Buttons
+            var rowBBtn = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
+            var btnBCenterX = CreateStyledButton("Center X", 65);
+            btnBCenterX.Click += (s, e) =>
+            {
+                var b = GetSelectedBlock();
+                if (b != null)
+                {
+                    b.Alignment = "Center";
+                    b.OffsetX = 0.0;
+                    LoadSelectedBlockValues();
+                    ApplyPreviewLive();
+                }
+            };
+            rowBBtn.Children.Add(btnBCenterX);
+
+            var btnBResetY = CreateStyledButton("Reset Y", 60);
+            btnBResetY.Margin = new Thickness(5, 0, 0, 0);
+            btnBResetY.Click += (s, e) =>
+            {
+                var b = GetSelectedBlock();
+                if (b != null)
+                {
+                    b.OffsetY = 0.0;
+                    LoadSelectedBlockValues();
+                    ApplyPreviewLive();
+                }
+            };
+            rowBBtn.Children.Add(btnBResetY);
+
+            var btnBSnap = CreateStyledButton("Snap Center", 75);
+            btnBSnap.Margin = new Thickness(5, 0, 0, 0);
+            btnBSnap.Click += (s, e) =>
+            {
+                var b = GetSelectedBlock();
+                if (b != null)
+                {
+                    b.Alignment = "Center";
+                    b.OffsetX = 0.0;
+                    b.OffsetY = 0.0;
+                    LoadSelectedBlockValues();
+                    ApplyPreviewLive();
+                }
+            };
+            rowBBtn.Children.Add(btnBSnap);
+
+            var btnResetBPos = CreateStyledButton("Reset All", 65);
+            btnResetBPos.Margin = new Thickness(5, 0, 0, 0);
             btnResetBPos.Click += (s, e) =>
             {
                 var b = GetSelectedBlock();
@@ -1868,8 +2309,31 @@ namespace DesktopClock
                     ApplyPreviewLive();
                 }
             };
-            rowBy.Children.Add(btnResetBPos);
-            appStack.Children.Add(rowBy);
+            rowBBtn.Children.Add(btnResetBPos);
+            appStack.Children.Add(rowBBtn);
+
+            // Block Nudge Toggle
+            _chkBlockNudgeMode = new CheckBox
+            {
+                Content = "Enable Keyboard Nudge Mode (\u2190 \u2191 \u2192 \u2193)",
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Brushes.White,
+                Margin = new Thickness(0, 2, 0, 2)
+            };
+            _chkBlockNudgeMode.Click += (s, e) =>
+            {
+                UpdateElementHighlight();
+            };
+            appStack.Children.Add(_chkBlockNudgeMode);
+
+            _lblBlockNudgeHelp = new TextBlock
+            {
+                Text = "Arrow Keys = 1 DIP  |  Ctrl = 0.5 DIP  |  Shift = 10 DIP",
+                Foreground = Brushes.Gray,
+                FontSize = 10,
+                Margin = new Thickness(20, 0, 0, 4)
+            };
+            appStack.Children.Add(_lblBlockNudgeHelp);
 
             var rowStyle = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
             _chkBlockItalic = new CheckBox { Content = "Italic", FontWeight = FontWeights.Medium, Margin = new Thickness(70, 0, 16, 0) };
@@ -2078,8 +2542,8 @@ namespace DesktopClock
                 _cmbBlockType.SelectedItem = b.Type ?? "Symbol";
                 _cmbBlockPosition.SelectedItem = b.Position ?? "Above Widget";
 
-                _cmbBlockPresetSymbol.SelectedItem = b.SymbolContent ?? "âœ¦";
-                _txtBlockCustomSymbol.Text = b.SymbolContent ?? "âœ¦";
+                _cmbBlockPresetSymbol.SelectedItem = b.SymbolContent ?? "\u2726";
+                _txtBlockCustomSymbol.Text = b.SymbolContent ?? "\u2726";
                 _txtBlockStaticText.Text = b.StaticContent ?? "";
 
                 _cmbBlockRotationMode.SelectedItem = b.RotationMode ?? "Sequential";
@@ -2099,10 +2563,12 @@ namespace DesktopClock
                 _sliderBlockOpacity.Value = Math.Round(b.Opacity * 100.0);
                 _lblBlockOpacity.Text = ((int)Math.Round(_sliderBlockOpacity.Value)) + "%";
                 _cmbBlockAlignment.SelectedItem = !string.IsNullOrEmpty(b.Alignment) ? b.Alignment : "Center";
-                _txtBlockOffsetX.Text = b.OffsetX.ToString();
+                _txtBlockOffsetX.Text = b.OffsetX.ToString("0.0", CultureInfo.InvariantCulture);
                 _sliderBlockOffsetX.Value = b.OffsetX;
-                _txtBlockOffsetY.Text = b.OffsetY.ToString();
+                _txtBlockOffsetY.Text = b.OffsetY.ToString("0.0", CultureInfo.InvariantCulture);
                 _sliderBlockOffsetY.Value = b.OffsetY;
+                UpdateBlockPosReadout();
+                UpdateElementHighlight();
                 _cmbBlockCase.SelectedItem = b.Case ?? "None";
                 _chkBlockItalic.IsChecked = b.Italic;
                 _chkBlockUnderline.IsChecked = b.Underline;
@@ -2150,7 +2616,7 @@ namespace DesktopClock
             var b = GetSelectedBlock();
             if (b == null || string.IsNullOrEmpty(b.FontFamily)) return;
             bool isFav = _preview.FavoriteFonts.Contains(b.FontFamily);
-            _btnBlockFontFav.Content = isFav ? "â˜…" : "â˜†";
+            _btnBlockFontFav.Content = isFav ? "\u2605" : "\u2606";
             _btnBlockFontFav.Foreground = isFav ? Brushes.Gold : Brushes.White;
         }
 
@@ -2321,7 +2787,7 @@ namespace DesktopClock
             foreach (var f in filtered)
             {
                 bool isFav = _preview.FavoriteFonts.Contains(f.Name);
-                string star = isFav ? "â˜… " : "   ";
+                string star = isFav ? "\u2605 " : "   ";
                 string tag = f.IsAppFont ? "[App]" : "[System]";
                 _lstCatalogFonts.Items.Add(star + f.Name + " " + tag + " (" + f.Category + ")");
             }
@@ -2341,7 +2807,7 @@ namespace DesktopClock
         {
             if (_lstCatalogFonts.SelectedItem == null) return;
             string item = _lstCatalogFonts.SelectedItem.ToString().Trim();
-            if (item.StartsWith("â˜… ")) item = item.Substring(2).Trim();
+            if (item.StartsWith("\u2605 ")) item = item.Substring(2).Trim();
             int tagIdx = item.IndexOf(" [");
             if (tagIdx > 0) item = item.Substring(0, tagIdx).Trim();
 

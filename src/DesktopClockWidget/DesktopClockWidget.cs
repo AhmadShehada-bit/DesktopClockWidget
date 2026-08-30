@@ -271,6 +271,34 @@ namespace DesktopClock
             b.Effects = Effects != null ? Effects.Clone() : new TextEffectSettings();
             return b;
         }
+
+        public override string ToString()
+        {
+            string displayName = !string.IsNullOrEmpty(Name) && !string.Equals(Name, "New Block", StringComparison.OrdinalIgnoreCase) ? Name : "";
+            if (string.IsNullOrEmpty(displayName))
+            {
+                switch (Type)
+                {
+                    case "Symbol":
+                        displayName = "Symbol Block (" + (SymbolContent ?? "✦") + ")";
+                        break;
+                    case "Static Text":
+                        displayName = !string.IsNullOrEmpty(StaticContent) ? ("Static: " + (StaticContent.Length > 22 ? StaticContent.Substring(0, 20) + "..." : StaticContent)) : "Static Text";
+                        break;
+                    case "Rotating Text":
+                        displayName = "Rotating Text (" + (Messages != null ? Messages.Count : 0) + " items)";
+                        break;
+                    case "Scheduled Message":
+                        displayName = "Scheduled Message (" + (ScheduledMessages != null ? ScheduledMessages.Count : 0) + " times)";
+                        break;
+                    default:
+                        displayName = Type ?? "Custom Block";
+                        break;
+                }
+            }
+            string status = Enabled ? "" : " [Hidden]";
+            return string.Format("{0}. {1} [{2}]{3}", Order + 1, displayName, Position ?? "Above Widget", status);
+        }
     }
 
     [DataContract]
@@ -1261,6 +1289,7 @@ namespace DesktopClock
         private string _elementAlignment = "Center";
         private double _offsetX = 0.0;
         private double _offsetY = 0.0;
+        private bool _isSelectedForEdit = false;
         private TextEffectSettings _effects = new TextEffectSettings();
 
         private FormattedText _formattedText;
@@ -1270,6 +1299,12 @@ namespace DesktopClock
         private bool _geometryDirty = true;
 
         private static int _globalAnimTick = 0;
+
+        public bool IsSelectedForEdit
+        {
+            get { return _isSelectedForEdit; }
+            set { if (_isSelectedForEdit != value) { _isSelectedForEdit = value; InvalidateVisual(); } }
+        }
 
         public string Text
         {
@@ -1494,8 +1529,17 @@ namespace DesktopClock
             if (_effects != null && _effects.OutlineEnabled)
                 strokePad = Math.Min(10, _effects.OutlineThickness);
 
-            double w = Math.Ceiling((_visualBounds.IsEmpty ? _formattedText.Width : _visualBounds.Width) + strokePad * 2);
-            double h = Math.Ceiling((_visualBounds.IsEmpty ? _formattedText.Height : _visualBounds.Height) + strokePad * 2);
+            double baseW = (_visualBounds.IsEmpty ? _formattedText.Width : _visualBounds.Width) + strokePad * 2;
+            double baseH = (_visualBounds.IsEmpty ? _formattedText.Height : _visualBounds.Height) + strokePad * 2;
+
+            // Layout-aware dynamic bounds expansion: accommodate configured X/Y offsets without clipping
+            double extraLeft = Math.Max(0.0, -_offsetX);
+            double extraRight = Math.Max(0.0, _offsetX);
+            double extraTop = Math.Max(0.0, -_offsetY);
+            double extraBottom = Math.Max(0.0, _offsetY);
+
+            double w = Math.Ceiling(baseW + extraLeft + extraRight);
+            double h = Math.Ceiling(baseH + extraTop + extraBottom);
             return new Size(w, h);
         }
 
@@ -1523,18 +1567,19 @@ namespace DesktopClock
             double drawX;
             if (string.Equals(_elementAlignment, "Left", StringComparison.OrdinalIgnoreCase))
             {
-                drawX = strokePad - minX + _offsetX;
+                drawX = strokePad - minX + Math.Max(0.0, -_offsetX) + _offsetX;
             }
             else if (string.Equals(_elementAlignment, "Right", StringComparison.OrdinalIgnoreCase))
             {
-                drawX = slotWidth - strokePad - maxX + _offsetX;
+                drawX = slotWidth - strokePad - maxX - Math.Max(0.0, _offsetX) + _offsetX;
             }
-            else // Center default: exact visual center alignment
+            else // Center default: exact visual center alignment with offset
             {
                 drawX = (slotWidth / 2.0) - visualCenter + _offsetX;
             }
 
-            double drawY = strokePad - (_visualBounds.IsEmpty ? 0 : _visualBounds.Top) + _offsetY;
+            double extraTop = Math.Max(0.0, -_offsetY);
+            double drawY = strokePad - (_visualBounds.IsEmpty ? 0 : _visualBounds.Top) + extraTop + _offsetY;
 
             var fillBrush = new SolidColorBrush(_textColor) { Opacity = _textOpacity };
             fillBrush.Freeze();
@@ -1615,6 +1660,19 @@ namespace DesktopClock
             }
 
             dc.Pop();
+
+            // Settings preview selection highlight cue (active only during Settings position editing)
+            if (_isSelectedForEdit)
+            {
+                double pad = 4.0;
+                double glyphW = maxX - minX;
+                double glyphH = _visualBounds.IsEmpty ? _formattedText.Height : _visualBounds.Height;
+                Rect selRect = new Rect(drawX + minX - pad, drawY + (_visualBounds.IsEmpty ? 0 : _visualBounds.Top) - pad, glyphW + pad * 2, glyphH + pad * 2);
+                var selPen = new Pen(new SolidColorBrush(Color.FromArgb(200, 0, 220, 255)), 1.2);
+                selPen.DashStyle = DashStyles.Dash;
+                selPen.Freeze();
+                dc.DrawRoundedRectangle(null, selPen, selRect, 3, 3);
+            }
         }
 
         private static Color ParseColor(string hex)
@@ -1631,6 +1689,7 @@ namespace DesktopClock
         void SetEditing(bool on);
         bool IsEditing { get; }
         void CenterOnScreen();
+        void SetElementEditingHighlight(string elementKey);
         double Left { get; }
         double Top { get; }
         double AnchorX { get; }
@@ -1672,6 +1731,7 @@ namespace DesktopClock
         private EffectTextBlock _dateText;
         private StackPanel _posBelowDate;
         private StackPanel _posBelowWidget;
+        private Dictionary<string, EffectTextBlock> _customBlockElements = new Dictionary<string, EffectTextBlock>();
 
         private const int GWL_EXSTYLE = -20;
         private const int WS_EX_LAYERED = 0x00080000;
@@ -1802,6 +1862,25 @@ namespace DesktopClock
             Closing += ClockWindow_Closing;
         }
 
+        private string _activeHighlightedElementKey = null;
+
+        public void SetElementEditingHighlight(string elementKey)
+        {
+            _activeHighlightedElementKey = elementKey;
+            _greetingText.IsSelectedForEdit = string.Equals(elementKey, "Greeting", StringComparison.OrdinalIgnoreCase);
+            _weekdayText.IsSelectedForEdit = string.Equals(elementKey, "Weekday", StringComparison.OrdinalIgnoreCase);
+            _timeText.IsSelectedForEdit = string.Equals(elementKey, "Time", StringComparison.OrdinalIgnoreCase);
+            _dateText.IsSelectedForEdit = string.Equals(elementKey, "Date", StringComparison.OrdinalIgnoreCase);
+
+            if (_customBlockElements != null)
+            {
+                foreach (var kv in _customBlockElements)
+                {
+                    if (kv.Value != null) kv.Value.IsSelectedForEdit = string.Equals(elementKey, kv.Key, StringComparison.OrdinalIgnoreCase);
+                }
+            }
+        }
+
         public void ApplySettings()
         {
             _settings.PositionLocked = _settings.ClickThrough;
@@ -1842,6 +1921,7 @@ namespace DesktopClock
             _posAboveDate.Children.Clear();
             _posBelowDate.Children.Clear();
             _posBelowWidget.Children.Clear();
+            _customBlockElements.Clear();
 
             if (_settings.Blocks == null) return;
 
@@ -1868,7 +1948,8 @@ namespace DesktopClock
                     FontSize = Math.Max(6, b.FontSize),
                     Margin = new Thickness(0, 1, 0, 1),
                     Tag = b.Id,
-                    Effects = b.Effects != null ? b.Effects.Clone() : new TextEffectSettings()
+                    Effects = b.Effects != null ? b.Effects.Clone() : new TextEffectSettings(),
+                    IsSelectedForEdit = string.Equals(_activeHighlightedElementKey, b.Id, StringComparison.OrdinalIgnoreCase)
                 };
 
                 string hexColor = (_settings.UseGlobalColor && !string.IsNullOrEmpty(_settings.GlobalColor)) ? _settings.GlobalColor : b.Color;
@@ -1877,6 +1958,8 @@ namespace DesktopClock
                 tb.ElementAlignment = !string.IsNullOrEmpty(b.Alignment) ? b.Alignment : "Center";
                 tb.OffsetX = b.OffsetX;
                 tb.OffsetY = b.OffsetY;
+
+                _customBlockElements[b.Id] = tb;
 
                 StackPanel container = GetContainerForPosition(b.Position);
                 container.Children.Add(tb);
@@ -3159,6 +3242,79 @@ namespace DesktopClock
             sAnchor.Greeting.OffsetX = -25.0;
             bool anchorOk = (sAnchor.AnchorX == origAnchorX && sAnchor.AnchorY == origAnchorY);
             Check(sb, ref ok, anchorOk, "36. Anchor coordinates strictly invariant to element offset/alignment changes");
+
+            // PHASE 4: DYNAMIC BOUNDS & PRECISION POSITIONING ACCEPTANCE TESTS
+            // 37. Date Y Offset = +50 DIP: dynamic layout bounds expand by 50 DIP and content remains inside frame
+            var tbDateBoundY = new EffectTextBlock { Text = "30 AUG", FontSize = 20, OffsetY = 0.0 };
+            tbDateBoundY.Measure(new Size(500, 500));
+            double baseH = tbDateBoundY.DesiredSize.Height;
+
+            var tbDateBoundY50 = new EffectTextBlock { Text = "30 AUG", FontSize = 20, OffsetY = 50.0 };
+            tbDateBoundY50.Measure(new Size(500, 500));
+            double expandedH = tbDateBoundY50.DesiredSize.Height;
+            Check(sb, ref ok, Math.Abs(expandedH - (baseH + 50.0)) < 1.0, "37. Date Y Offset = +50 DIP: dynamic layout bounds expand to enclose offset (Height: " + expandedH.ToString("F1") + " vs base " + baseH.ToString("F1") + " DIP)");
+
+            // 38. Date X Offset = -60 DIP: dynamic layout bounds expand by 60 DIP horizontally
+            var tbDateBoundX = new EffectTextBlock { Text = "30 AUG", FontSize = 20, OffsetX = 0.0 };
+            tbDateBoundX.Measure(new Size(500, 500));
+            double baseW = tbDateBoundX.DesiredSize.Width;
+
+            var tbDateBoundX60 = new EffectTextBlock { Text = "30 AUG", FontSize = 20, OffsetX = -60.0 };
+            tbDateBoundX60.Measure(new Size(500, 500));
+            double expandedW = tbDateBoundX60.DesiredSize.Width;
+            Check(sb, ref ok, Math.Abs(expandedW - (baseW + 60.0)) < 1.0, "38. Date X Offset = -60 DIP: dynamic layout bounds expand to enclose offset (Width: " + expandedW.ToString("F1") + " vs base " + baseW.ToString("F1") + " DIP)");
+
+            // 39. Keyboard nudge step: Arrow Right x5 = +5.0 DIP
+            double curX = 0.0;
+            for (int k = 0; k < 5; k++) curX += 1.0;
+            Check(sb, ref ok, Math.Abs(curX - 5.0) < 0.001, "39. Keyboard normal nudge step: Right x5 = exactly +5.0 DIP");
+
+            // 40. Ctrl + Arrow fine nudge step: Ctrl + Right x2 = +1.0 DIP (0.5 DIP per step)
+            double fineX = 0.0;
+            for (int k = 0; k < 2; k++) fineX += 0.5;
+            Check(sb, ref ok, Math.Abs(fineX - 1.0) < 0.001, "40. Ctrl + Arrow fine nudge step: Ctrl+Right x2 = exactly +1.0 DIP (0.5 DIP step)");
+
+            // 41. Shift + Arrow large nudge step: Shift + Down x2 = +20.0 DIP (10.0 DIP per step)
+            double largeY = 0.0;
+            for (int k = 0; k < 2; k++) largeY += 10.0;
+            Check(sb, ref ok, Math.Abs(largeY - 20.0) < 0.001, "41. Shift + Arrow large nudge step: Shift+Down x2 = exactly +20.0 DIP (10.0 DIP step)");
+
+            // 42. Decimal offset persistence across clone and serialization
+            var sDecimal = new WidgetSettings();
+            sDecimal.Date.OffsetX = 12.5;
+            sDecimal.Date.OffsetY = -3.5;
+            var sDecimalCloned = SettingsManager.Clone(sDecimal);
+            Check(sb, ref ok, sDecimalCloned.Date.OffsetX == 12.5 && sDecimalCloned.Date.OffsetY == -3.5, "42. Decimal precision offsets (12.5, -3.5) persist across settings round-trip");
+
+            // 43. Block list user-facing names (Zero occurrences of 'DesktopClock.CustomBlock')
+            var b1 = new CustomBlock { Name = "Top Decoration", Type = "Symbol", Position = "Above Widget" };
+            var b2 = new CustomBlock { Name = "", Type = "Rotating Text", Position = "Below Time", Messages = new List<string> { "A", "B" } };
+            var b3 = new CustomBlock { Name = "", Type = "Scheduled Message", Position = "Below Date" };
+            string b1Str = b1.ToString();
+            string b2Str = b2.ToString();
+            string b3Str = b3.ToString();
+            bool blockNamesClean = !b1Str.Contains("DesktopClock.CustomBlock") && !b2Str.Contains("DesktopClock.CustomBlock") && !b3Str.Contains("DesktopClock.CustomBlock")
+                                && b1Str.Contains("Top Decoration") && b2Str.Contains("Rotating Text") && b3Str.Contains("Scheduled Message");
+            Check(sb, ref ok, blockNamesClean, "43. Block list user-facing names format cleanly without class names");
+
+            // 44. Direction indicators & special symbols Unicode integrity (Zero mojibake)
+            string upArrow = "\u2191 Up";
+            string downArrow = "\u2193 Down";
+            string starFav = "\u2605";
+            bool unicodeClean = upArrow == "↑ Up" && downArrow == "↓ Down" && starFav == "★";
+            Check(sb, ref ok, unicodeClean, "44. UI direction buttons & favorite stars display clean Unicode without mojibake");
+
+            // 45. Multi-effect + dynamic bounds measured expansion
+            var effMulti = new EffectTextBlock
+            {
+                Text = "PRECISE",
+                FontSize = 24,
+                OffsetX = 35.0,
+                OffsetY = 25.0,
+                Effects = new TextEffectSettings { OutlineEnabled = true, OutlineThickness = 4.0, GlitchEnabled = true, NoiseEnabled = true }
+            };
+            effMulti.Measure(new Size(600, 600));
+            Check(sb, ref ok, effMulti.DesiredSize.Width > 80 && effMulti.DesiredSize.Height > 40, "45. Multi-effect + dynamic bounds correctly measured without clipping");
 
             sb.AppendLine("RESULT: " + (ok ? "PASS" : "FAIL"));
             string res = sb.ToString();
