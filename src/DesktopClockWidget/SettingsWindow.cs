@@ -53,6 +53,24 @@ namespace DesktopClock
 
         private TabControl _tabs;
 
+        // Themes Tab
+        private ComboBox _cmbThemeFilter;
+        private TextBox _txtThemeSearch;
+        private ListBox _lstThemes;
+        private TextBlock _lblThemeStats;
+        private Button _btnApplyTheme;
+        private Button _btnSaveThemePreset;
+        private Button _btnRenameThemePreset;
+        private Button _btnDeleteThemePreset;
+        private Button _btnDuplicateThemePreset;
+        private Button _btnResetThemeDefault;
+        private TextBlock _lblThemeDetailName;
+        private TextBlock _lblThemeDetailBadge;
+        private TextBlock _lblThemeDetailDesc;
+        private TextBlock _lblThemeDetailFont;
+        private TextBlock _lblThemeDetailEffects;
+        private TextBlock _lblThemeDetailBlocks;
+
         // Core Elements Tab
         private ComboBox _cmbCoreElementSelector;
         private CheckBox _chkCoreElemVisible;
@@ -253,6 +271,10 @@ namespace DesktopClock
             tabGeneral.Content = CreateGeneralTab();
             tabs.Items.Add(tabGeneral);
 
+            var tabThemes = new TabItem { Header = "  THEMES  " };
+            tabThemes.Content = CreateThemesTab();
+            tabs.Items.Add(tabThemes);
+
             var tabCore = new TabItem { Header = "  CORE ELEMENTS  " };
             tabCore.Content = CreateCoreElementsTab();
             tabs.Items.Add(tabCore);
@@ -264,6 +286,14 @@ namespace DesktopClock
             var tabFonts = new TabItem { Header = "  FONT CATALOG  " };
             tabFonts.Content = CreateFontCatalogTab();
             tabs.Items.Add(tabFonts);
+
+            var tabModules = new TabItem { Header = "  MODULES  " };
+            tabModules.Content = CreateModulesTab();
+            tabs.Items.Add(tabModules);
+
+            var tabTimezones = new TabItem { Header = "  TIMEZONES  " };
+            tabTimezones.Content = CreateTimezonesTab();
+            tabs.Items.Add(tabTimezones);
 
             var tabPos = new TabItem { Header = "  POSITION  " };
             tabPos.Content = CreatePositionTab();
@@ -331,6 +361,10 @@ namespace DesktopClock
 
             PreviewKeyDown -= SettingsWindow_PreviewKeyDown;
 
+            if (_lstThemes != null)
+            {
+                _lstThemes.Items.Clear();
+            }
             if (_lstCatalogFonts != null)
             {
                 _lstCatalogFonts.Items.Clear();
@@ -558,6 +592,593 @@ namespace DesktopClock
             if (int.TryParse(_txtEveningStart.Text, out ev)) _preview.EveningStart = ev;
             if (int.TryParse(_txtNightStart.Text, out n)) _preview.NightStart = n;
             ApplyPreviewLive();
+        }
+
+        private UIElement CreateThemesTab()
+        {
+            var mainGrid = new Grid { Margin = new Thickness(10) };
+            mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            // Top Filter & Search Bar
+            var topBar = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
+
+            topBar.Children.Add(new TextBlock { Text = "Filter:", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 4, 0) });
+            _cmbThemeFilter = CreateComboBox(110);
+            _cmbThemeFilter.Items.Add("All Themes");
+            _cmbThemeFilter.Items.Add("Built-in Themes");
+            _cmbThemeFilter.Items.Add("Custom Themes");
+            _cmbThemeFilter.SelectedIndex = 0;
+            _cmbThemeFilter.SelectionChanged += (s, e) => PopulateThemesList();
+            topBar.Children.Add(_cmbThemeFilter);
+
+            topBar.Children.Add(new TextBlock { Text = "Search:", Margin = new Thickness(8, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center });
+            _txtThemeSearch = CreateTextBox(130);
+            _txtThemeSearch.TextChanged += (s, e) => PopulateThemesList();
+            topBar.Children.Add(_txtThemeSearch);
+
+            _btnSaveThemePreset = CreateStyledButton("+ Save As Preset...", 140);
+            _btnSaveThemePreset.Margin = new Thickness(12, 0, 0, 0);
+            _btnSaveThemePreset.Click += (s, e) => ShowSavePresetDialog();
+            topBar.Children.Add(_btnSaveThemePreset);
+
+            Grid.SetRow(topBar, 0);
+            mainGrid.Children.Add(topBar);
+
+            // Preset Cards ListBox
+            _lstThemes = new ListBox
+            {
+                Background = new SolidColorBrush(Color.FromRgb(28, 30, 33)),
+                Foreground = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(50, 52, 58)),
+                Margin = new Thickness(0, 0, 0, 8),
+                HorizontalContentAlignment = HorizontalAlignment.Stretch
+            };
+            VirtualizingStackPanel.SetIsVirtualizing(_lstThemes, true);
+            VirtualizingStackPanel.SetVirtualizationMode(_lstThemes, VirtualizationMode.Recycling);
+            ScrollViewer.SetIsDeferredScrollingEnabled(_lstThemes, false);
+
+            _lstThemes.SelectionChanged += (s, e) =>
+            {
+                if (_isUpdatingUi) return;
+                UpdateThemeInspector();
+                ApplySelectedThemeLive();
+            };
+
+            Grid.SetRow(_lstThemes, 1);
+            mainGrid.Children.Add(_lstThemes);
+
+            // Theme Inspector & Management Toolbar
+            var inspectorBorder = new Border
+            {
+                BorderBrush = new SolidColorBrush(Color.FromRgb(50, 52, 58)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(10),
+                Background = new SolidColorBrush(Color.FromRgb(22, 24, 26)),
+                Margin = new Thickness(0, 0, 0, 6)
+            };
+
+            var inspectorGrid = new Grid();
+            inspectorGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            inspectorGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            inspectorGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            // Inspector Row 0: Header & Badges
+            var inspHeader = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
+            _lblThemeDetailName = new TextBlock { Text = "Theme Name", FontWeight = FontWeights.Bold, FontSize = 14, Foreground = Brushes.White, Margin = new Thickness(0, 0, 8, 0) };
+            _lblThemeDetailBadge = new TextBlock { Text = "[Built-in Preset]", FontSize = 11, Foreground = new SolidColorBrush(Color.FromRgb(79, 209, 197)), VerticalAlignment = VerticalAlignment.Center };
+            inspHeader.Children.Add(_lblThemeDetailName);
+            inspHeader.Children.Add(_lblThemeDetailBadge);
+            Grid.SetRow(inspHeader, 0);
+            inspectorGrid.Children.Add(inspHeader);
+
+            // Inspector Row 1: Description & Specs
+            var inspDetails = new StackPanel { Margin = new Thickness(0, 0, 0, 8) };
+            _lblThemeDetailDesc = new TextBlock { Text = "Theme description", Foreground = Brushes.LightGray, FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 4) };
+            _lblThemeDetailFont = new TextBlock { Text = "Font: Audiowide | Scale: 100% | Opacity: 100%", Foreground = new SolidColorBrush(Color.FromRgb(170, 170, 170)), FontSize = 11 };
+            _lblThemeDetailEffects = new TextBlock { Text = "Effects: Glitch (40%), Outline (1.5px)", Foreground = new SolidColorBrush(Color.FromRgb(170, 170, 170)), FontSize = 11 };
+            _lblThemeDetailBlocks = new TextBlock { Text = "Blocks: 2 custom blocks included", Foreground = new SolidColorBrush(Color.FromRgb(170, 170, 170)), FontSize = 11 };
+
+            inspDetails.Children.Add(_lblThemeDetailDesc);
+            inspDetails.Children.Add(_lblThemeDetailFont);
+            inspDetails.Children.Add(_lblThemeDetailEffects);
+            inspDetails.Children.Add(_lblThemeDetailBlocks);
+            Grid.SetRow(inspDetails, 1);
+            inspectorGrid.Children.Add(inspDetails);
+
+            // Inspector Row 2: Action Buttons
+            var actionRow = new StackPanel { Orientation = Orientation.Horizontal };
+
+            _btnApplyTheme = CreateStyledButton("Apply Theme", 100);
+            _btnApplyTheme.Click += (s, e) => ApplySelectedThemeLive();
+            actionRow.Children.Add(_btnApplyTheme);
+
+            _btnDuplicateThemePreset = CreateStyledButton("Duplicate as Custom", 130);
+            _btnDuplicateThemePreset.Click += (s, e) => DuplicateSelectedTheme();
+            actionRow.Children.Add(_btnDuplicateThemePreset);
+
+            _btnRenameThemePreset = CreateStyledButton("✎ Rename...", 90);
+            _btnRenameThemePreset.Click += (s, e) => ShowRenamePresetDialog();
+            actionRow.Children.Add(_btnRenameThemePreset);
+
+            _btnDeleteThemePreset = CreateStyledButton("🗑 Delete", 80);
+            _btnDeleteThemePreset.Click += (s, e) => ConfirmDeletePreset();
+            actionRow.Children.Add(_btnDeleteThemePreset);
+
+            _btnResetThemeDefault = CreateStyledButton("↺ Reset Default", 105);
+            _btnResetThemeDefault.Click += (s, e) => ResetToDefaultTheme();
+            actionRow.Children.Add(_btnResetThemeDefault);
+
+            Grid.SetRow(actionRow, 2);
+            inspectorGrid.Children.Add(actionRow);
+
+            inspectorBorder.Child = inspectorGrid;
+            Grid.SetRow(inspectorBorder, 2);
+            mainGrid.Children.Add(inspectorBorder);
+
+            // Bottom Stats Bar
+            _lblThemeStats = new TextBlock
+            {
+                Text = "Built-in: 10 | Custom: 0 | Total: 10",
+                Foreground = Brushes.Gray,
+                FontSize = 11,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 2, 0, 0)
+            };
+            Grid.SetRow(_lblThemeStats, 3);
+            mainGrid.Children.Add(_lblThemeStats);
+
+            return mainGrid;
+        }
+
+        private void PopulateThemesList(string selectThemeId = null)
+        {
+            if (_lstThemes == null) return;
+
+            string filter = _cmbThemeFilter != null && _cmbThemeFilter.SelectedItem != null ? _cmbThemeFilter.SelectedItem.ToString() : "All Themes";
+            string search = _txtThemeSearch != null ? _txtThemeSearch.Text.Trim().ToLowerInvariant() : "";
+
+            List<ThemePreset> allPresets = ThemeManager.GetAllThemes();
+            List<ThemePreset> filtered = new List<ThemePreset>();
+
+            foreach (var p in allPresets)
+            {
+                if (filter == "Built-in Themes" && !p.IsBuiltIn) continue;
+                if (filter == "Custom Themes" && p.IsBuiltIn) continue;
+
+                if (!string.IsNullOrEmpty(search))
+                {
+                    bool matchName = p.Name != null && p.Name.ToLowerInvariant().Contains(search);
+                    bool matchDesc = p.Description != null && p.Description.ToLowerInvariant().Contains(search);
+                    bool matchFont = p.GlobalFont != null && p.GlobalFont.ToLowerInvariant().Contains(search);
+                    if (!matchName && !matchDesc && !matchFont) continue;
+                }
+
+                filtered.Add(p);
+            }
+
+            _isUpdatingUi = true;
+            try
+            {
+                _lstThemes.Items.Clear();
+                int selectedIndex = -1;
+                for (int i = 0; i < filtered.Count; i++)
+                {
+                    var p = filtered[i];
+                    var card = CreateThemeCard(p);
+                    _lstThemes.Items.Add(card);
+                    if (!string.IsNullOrEmpty(selectThemeId) && string.Equals(p.Id, selectThemeId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        selectedIndex = i;
+                    }
+                }
+
+                int builtInCount = ThemeManager.GetBuiltInThemes().Count;
+                int customCount = ThemeManager.GetCustomThemes().Count;
+                if (_lblThemeStats != null)
+                {
+                    _lblThemeStats.Text = string.Format("Built-in: {0} | Custom: {1} | Total: {2} | Showing: {3}", builtInCount, customCount, allPresets.Count, filtered.Count);
+                }
+
+                if (_lstThemes.Items.Count > 0)
+                {
+                    _lstThemes.SelectedIndex = selectedIndex >= 0 ? selectedIndex : 0;
+                }
+            }
+            finally
+            {
+                _isUpdatingUi = false;
+            }
+
+            UpdateThemeInspector();
+        }
+
+        private ListBoxItem CreateThemeCard(ThemePreset preset)
+        {
+            var item = new ListBoxItem
+            {
+                Tag = preset,
+                Padding = new Thickness(8, 6, 8, 6),
+                Margin = new Thickness(0, 1, 0, 1),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(40, 42, 46)),
+                BorderThickness = new Thickness(0, 0, 0, 1),
+                Background = Brushes.Transparent,
+                HorizontalContentAlignment = HorizontalAlignment.Stretch
+            };
+
+            var cardGrid = new Grid();
+            cardGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            cardGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var leftStack = new StackPanel();
+
+            // Row 1: Title and Badge
+            var titleRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 2) };
+            titleRow.Children.Add(new TextBlock { Text = preset.Name, FontWeight = FontWeights.SemiBold, FontSize = 13, Foreground = Brushes.White, Margin = new Thickness(0, 0, 8, 0) });
+
+            var badgeBorder = new Border
+            {
+                CornerRadius = new CornerRadius(3),
+                Padding = new Thickness(4, 1, 4, 1),
+                Background = preset.IsBuiltIn ? new SolidColorBrush(Color.FromRgb(45, 55, 72)) : new SolidColorBrush(Color.FromRgb(74, 59, 44))
+            };
+            badgeBorder.Child = new TextBlock
+            {
+                Text = preset.IsBuiltIn ? "BUILT-IN" : "CUSTOM",
+                FontSize = 9.5,
+                FontWeight = FontWeights.Bold,
+                Foreground = preset.IsBuiltIn ? new SolidColorBrush(Color.FromRgb(79, 209, 197)) : new SolidColorBrush(Color.FromRgb(236, 201, 75))
+            };
+            titleRow.Children.Add(badgeBorder);
+            leftStack.Children.Add(titleRow);
+
+            // Row 2: Description
+            if (!string.IsNullOrEmpty(preset.Description))
+            {
+                leftStack.Children.Add(new TextBlock
+                {
+                    Text = preset.Description,
+                    FontSize = 11,
+                    Foreground = Brushes.LightGray,
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 0, 0, 3)
+                });
+            }
+
+            // Row 3: Meta tags
+            var metaRow = new StackPanel { Orientation = Orientation.Horizontal };
+            string fontLabel = preset.UseGlobalFont ? preset.GlobalFont : (preset.Time != null ? preset.Time.FontFamily : "Audiowide");
+            metaRow.Children.Add(new TextBlock { Text = "[Font: " + fontLabel + "]", FontSize = 10, Foreground = Brushes.Gray, Margin = new Thickness(0, 0, 8, 0) });
+            metaRow.Children.Add(new TextBlock { Text = "[Scale: " + ((int)Math.Round(preset.Scale * 100)) + "%]", FontSize = 10, Foreground = Brushes.Gray, Margin = new Thickness(0, 0, 8, 0) });
+            if (preset.Blocks != null && preset.Blocks.Count > 0)
+            {
+                metaRow.Children.Add(new TextBlock { Text = "[" + preset.Blocks.Count + " Blocks]", FontSize = 10, Foreground = Brushes.Gray });
+            }
+            leftStack.Children.Add(metaRow);
+
+            Grid.SetColumn(leftStack, 0);
+            cardGrid.Children.Add(leftStack);
+
+            // Right Column: Color Swatch
+            var rightStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
+            string primaryColor = preset.UseGlobalColor ? preset.GlobalColor : (preset.Time != null ? preset.Time.Color : "#D6D3D0");
+            var swatch = new Rectangle
+            {
+                Width = 20,
+                Height = 20,
+                RadiusX = 3,
+                RadiusY = 3,
+                Fill = new SolidColorBrush(ParseColor(primaryColor)),
+                Stroke = new SolidColorBrush(Color.FromRgb(70, 72, 80)),
+                StrokeThickness = 1
+            };
+            rightStack.Children.Add(swatch);
+
+            Grid.SetColumn(rightStack, 1);
+            cardGrid.Children.Add(rightStack);
+
+            item.Content = cardGrid;
+            return item;
+        }
+
+        private void UpdateThemeInspector()
+        {
+            var preset = GetSelectedThemePreset();
+            if (preset == null)
+            {
+                if (_lblThemeDetailName != null) _lblThemeDetailName.Text = "No theme selected";
+                if (_lblThemeDetailBadge != null) _lblThemeDetailBadge.Text = "";
+                if (_lblThemeDetailDesc != null) _lblThemeDetailDesc.Text = "";
+                if (_lblThemeDetailFont != null) _lblThemeDetailFont.Text = "";
+                if (_lblThemeDetailEffects != null) _lblThemeDetailEffects.Text = "";
+                if (_lblThemeDetailBlocks != null) _lblThemeDetailBlocks.Text = "";
+                if (_btnRenameThemePreset != null) _btnRenameThemePreset.IsEnabled = false;
+                if (_btnDeleteThemePreset != null) _btnDeleteThemePreset.IsEnabled = false;
+                if (_btnDuplicateThemePreset != null) _btnDuplicateThemePreset.IsEnabled = false;
+                if (_btnApplyTheme != null) _btnApplyTheme.IsEnabled = false;
+                return;
+            }
+
+            if (_lblThemeDetailName != null) _lblThemeDetailName.Text = preset.Name;
+            if (_lblThemeDetailBadge != null)
+            {
+                _lblThemeDetailBadge.Text = preset.IsBuiltIn ? "[Built-in Preset]" : "[Custom User Preset]";
+                _lblThemeDetailBadge.Foreground = preset.IsBuiltIn ? new SolidColorBrush(Color.FromRgb(79, 209, 197)) : new SolidColorBrush(Color.FromRgb(236, 201, 75));
+            }
+            if (_lblThemeDetailDesc != null) _lblThemeDetailDesc.Text = !string.IsNullOrEmpty(preset.Description) ? preset.Description : "No description provided.";
+
+            string fontSummary = preset.UseGlobalFont ? ("Global Font: " + preset.GlobalFont) : ("Time: " + (preset.Time != null ? preset.Time.FontFamily : "Audiowide") + " | Date: " + (preset.Date != null ? preset.Date.FontFamily : "Audiowide"));
+            if (_lblThemeDetailFont != null)
+            {
+                _lblThemeDetailFont.Text = string.Format("{0} | Scale: {1}% | Opacity: {2}%", fontSummary, (int)Math.Round(preset.Scale * 100), (int)Math.Round(preset.MasterOpacity * 100));
+            }
+
+            // Effects readout
+            string fxSummary = "None";
+            if (preset.Time != null && preset.Time.Effects != null)
+            {
+                var fx = preset.Time.Effects;
+                var list = new List<string>();
+                if (fx.OutlineEnabled) list.Add("Outline (" + fx.OutlineThickness.ToString("F1") + "px)");
+                if (fx.GlitchEnabled) list.Add("Glitch (" + fx.GlitchIntensity.ToString("F0") + "%)");
+                if (fx.NoiseEnabled) list.Add("Noise (" + fx.NoiseAmount.ToString("F0") + "%)");
+                if (list.Count > 0) fxSummary = string.Join(", ", list.ToArray());
+            }
+            if (_lblThemeDetailEffects != null)
+            {
+                _lblThemeDetailEffects.Text = "Effects (Time): " + fxSummary;
+            }
+
+            int blkCount = preset.Blocks != null ? preset.Blocks.Count : 0;
+            if (_lblThemeDetailBlocks != null)
+            {
+                _lblThemeDetailBlocks.Text = "Custom Blocks: " + blkCount + " block(s) included in theme";
+            }
+
+            if (_btnRenameThemePreset != null) _btnRenameThemePreset.IsEnabled = !preset.IsBuiltIn;
+            if (_btnDeleteThemePreset != null) _btnDeleteThemePreset.IsEnabled = !preset.IsBuiltIn;
+            if (_btnDuplicateThemePreset != null) _btnDuplicateThemePreset.IsEnabled = true;
+            if (_btnApplyTheme != null) _btnApplyTheme.IsEnabled = true;
+        }
+
+        private ThemePreset GetSelectedThemePreset()
+        {
+            if (_lstThemes == null || _lstThemes.SelectedItem == null) return null;
+            var lbi = _lstThemes.SelectedItem as ListBoxItem;
+            if (lbi != null) return lbi.Tag as ThemePreset;
+            return _lstThemes.SelectedItem as ThemePreset;
+        }
+
+        private void ApplySelectedThemeLive()
+        {
+            var preset = GetSelectedThemePreset();
+            if (preset == null || _preview == null) return;
+
+            ThemeManager.ApplyToSettings(preset, _preview);
+
+            // Pin active theme fonts into catalog memory
+            if (_preview.Greeting != null && !string.IsNullOrEmpty(_preview.Greeting.FontFamily)) Fonts.PinFamily(_preview.Greeting.FontFamily);
+            if (_preview.Weekday != null && !string.IsNullOrEmpty(_preview.Weekday.FontFamily)) Fonts.PinFamily(_preview.Weekday.FontFamily);
+            if (_preview.Time != null && !string.IsNullOrEmpty(_preview.Time.FontFamily)) Fonts.PinFamily(_preview.Time.FontFamily);
+            if (_preview.Date != null && !string.IsNullOrEmpty(_preview.Date.FontFamily)) Fonts.PinFamily(_preview.Date.FontFamily);
+            if (_preview.Blocks != null)
+            {
+                foreach (var b in _preview.Blocks)
+                {
+                    if (b != null && !string.IsNullOrEmpty(b.FontFamily)) Fonts.PinFamily(b.FontFamily);
+                }
+            }
+
+            ApplyPreviewLive();
+            SyncAllTabsFromPreview();
+        }
+
+        private void SyncAllTabsFromPreview()
+        {
+            _isUpdatingUi = true;
+            try
+            {
+                if (_chkUseGlobalFont != null) _chkUseGlobalFont.IsChecked = _preview.UseGlobalFont;
+                if (_cmbGlobalFont != null) _cmbGlobalFont.SelectedItem = _preview.GlobalFont;
+                if (_chkUseGlobalColor != null) _chkUseGlobalColor.IsChecked = _preview.UseGlobalColor;
+                if (_lblGlobalColorHex != null) _lblGlobalColorHex.Text = _preview.GlobalColor ?? "#D6D3D0";
+                if (_rectGlobalColorSwatch != null) _rectGlobalColorSwatch.Fill = new SolidColorBrush(ParseColor(_preview.GlobalColor));
+                if (_sliderMasterScale != null)
+                {
+                    _sliderMasterScale.Value = Math.Round(_preview.Scale * 100.0);
+                    if (_lblMasterScale != null) _lblMasterScale.Text = ((int)Math.Round(_sliderMasterScale.Value)) + "%";
+                }
+                LoadSelectedCoreElementValues();
+                RefreshBlocksList();
+            }
+            finally
+            {
+                _isUpdatingUi = false;
+            }
+        }
+
+        private void ShowSavePresetDialog()
+        {
+            var win = new Window
+            {
+                Title = "Save As Custom Theme Preset",
+                Width = 420,
+                Height = 230,
+                Owner = this,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                ResizeMode = ResizeMode.NoResize,
+                Background = new SolidColorBrush(Color.FromRgb(32, 34, 37)),
+                Foreground = Brushes.White,
+                ShowInTaskbar = false
+            };
+
+            var root = new StackPanel { Margin = new Thickness(14) };
+
+            root.Children.Add(new TextBlock { Text = "Theme Name:", FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 4) });
+            var txtName = CreateTextBox(370);
+            txtName.Text = "Custom Theme " + (ThemeManager.GetCustomThemes().Count + 1);
+            txtName.SelectAll();
+            root.Children.Add(txtName);
+
+            root.Children.Add(new TextBlock { Text = "Description (Optional):", Margin = new Thickness(0, 8, 0, 4) });
+            var txtDesc = CreateTextBox(370);
+            txtDesc.Text = "User custom aesthetic theme";
+            root.Children.Add(txtDesc);
+
+            var btnPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
+
+            var btnSave = CreateStyledButton("Save", 80);
+            btnSave.IsDefault = true;
+            btnSave.Click += (s, e) =>
+            {
+                string name = txtName.Text.Trim();
+                if (string.IsNullOrEmpty(name))
+                {
+                    MessageBox.Show("Theme name cannot be empty.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                var newPreset = ThemePreset.FromSettings(Guid.NewGuid().ToString(), name, txtDesc.Text.Trim(), _preview);
+                ThemeManager.SaveCustomTheme(newPreset);
+
+                win.DialogResult = true;
+                win.Close();
+
+                PopulateThemesList(newPreset.Id);
+            };
+
+            var btnCancel = CreateStyledButton("Cancel", 80);
+            btnCancel.IsCancel = true;
+            btnCancel.Click += (s, e) => win.Close();
+
+            btnPanel.Children.Add(btnSave);
+            btnPanel.Children.Add(btnCancel);
+            root.Children.Add(btnPanel);
+
+            win.Content = root;
+            win.ShowDialog();
+        }
+
+        private void ShowRenamePresetDialog()
+        {
+            var preset = GetSelectedThemePreset();
+            if (preset == null || preset.IsBuiltIn)
+            {
+                MessageBox.Show("Built-in themes cannot be renamed.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var win = new Window
+            {
+                Title = "Rename Custom Theme Preset",
+                Width = 420,
+                Height = 210,
+                Owner = this,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                ResizeMode = ResizeMode.NoResize,
+                Background = new SolidColorBrush(Color.FromRgb(32, 34, 37)),
+                Foreground = Brushes.White,
+                ShowInTaskbar = false
+            };
+
+            var root = new StackPanel { Margin = new Thickness(14) };
+
+            root.Children.Add(new TextBlock { Text = "New Theme Name:", FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 4) });
+            var txtName = CreateTextBox(370);
+            txtName.Text = preset.Name;
+            txtName.SelectAll();
+            root.Children.Add(txtName);
+
+            root.Children.Add(new TextBlock { Text = "Description:", Margin = new Thickness(0, 8, 0, 4) });
+            var txtDesc = CreateTextBox(370);
+            txtDesc.Text = preset.Description ?? "";
+            root.Children.Add(txtDesc);
+
+            var btnPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
+
+            var btnSave = CreateStyledButton("Rename", 80);
+            btnSave.IsDefault = true;
+            btnSave.Click += (s, e) =>
+            {
+                string name = txtName.Text.Trim();
+                if (string.IsNullOrEmpty(name))
+                {
+                    MessageBox.Show("Theme name cannot be empty.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                preset.Name = name;
+                preset.Description = txtDesc.Text.Trim();
+                ThemeManager.SaveCustomTheme(preset);
+
+                win.DialogResult = true;
+                win.Close();
+
+                PopulateThemesList(preset.Id);
+            };
+
+            var btnCancel = CreateStyledButton("Cancel", 80);
+            btnCancel.IsCancel = true;
+            btnCancel.Click += (s, e) => win.Close();
+
+            btnPanel.Children.Add(btnSave);
+            btnPanel.Children.Add(btnCancel);
+            root.Children.Add(btnPanel);
+
+            win.Content = root;
+            win.ShowDialog();
+        }
+
+        private void ConfirmDeletePreset()
+        {
+            var preset = GetSelectedThemePreset();
+            if (preset == null) return;
+            if (preset.IsBuiltIn)
+            {
+                MessageBox.Show("Built-in themes cannot be deleted.", "Protected Theme", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var res = MessageBox.Show(
+                string.Format("Are you sure you want to delete the custom theme \"{0}\"?", preset.Name),
+                "Confirm Delete",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (res == MessageBoxResult.Yes)
+            {
+                ThemeManager.DeleteCustomTheme(preset.Id);
+                PopulateThemesList();
+                ApplySelectedThemeLive();
+            }
+        }
+
+        private void DuplicateSelectedTheme()
+        {
+            var preset = GetSelectedThemePreset();
+            if (preset == null) return;
+
+            var copy = preset.Clone();
+            copy.Id = Guid.NewGuid().ToString();
+            copy.Name = preset.Name + " (Copy)";
+            copy.IsBuiltIn = false;
+            copy.Description = "Custom variation of " + preset.Name;
+            ThemeManager.SaveCustomTheme(copy);
+
+            PopulateThemesList(copy.Id);
+        }
+
+        private void ResetToDefaultTheme()
+        {
+            var defaults = ThemeManager.GetBuiltInThemes();
+            if (defaults.Count > 0)
+            {
+                PopulateThemesList(defaults[0].Id);
+                ApplySelectedThemeLive();
+            }
         }
 
         private UIElement CreateCoreElementsTab()
@@ -1598,7 +2219,7 @@ namespace DesktopClock
         private void UpdateElementHighlight()
         {
             if (_host == null) return;
-            if (_tabs != null && _tabs.SelectedIndex == 1 && _chkCoreElemNudgeMode != null && _chkCoreElemNudgeMode.IsChecked == true)
+            if (_tabs != null && _tabs.SelectedIndex == 2 && _chkCoreElemNudgeMode != null && _chkCoreElemNudgeMode.IsChecked == true)
             {
                 string key = "Time";
                 if (_cmbCoreElementSelector != null)
@@ -1613,7 +2234,7 @@ namespace DesktopClock
                 }
                 _host.SetElementEditingHighlight(key);
             }
-            else if (_tabs != null && _tabs.SelectedIndex == 2 && _chkBlockNudgeMode != null && _chkBlockNudgeMode.IsChecked == true)
+            else if (_tabs != null && _tabs.SelectedIndex == 3 && _chkBlockNudgeMode != null && _chkBlockNudgeMode.IsChecked == true)
             {
                 var b = GetSelectedBlock();
                 _host.SetElementEditingHighlight(b != null ? b.Id : null);
@@ -1629,7 +2250,7 @@ namespace DesktopClock
             var focused = Keyboard.FocusedElement as DependencyObject;
 
             // If user is focused inside a general text editing box (like custom text, rotating msg, search), let normal editing work
-            if (focused == _txtBlockStaticText || focused == _txtCustomGreeting || focused == _txtCatalogSearch || focused == _txtCoreElemFontSearch)
+            if (focused == _txtBlockStaticText || focused == _txtCustomGreeting || focused == _txtCatalogSearch || focused == _txtCoreElemFontSearch || focused == _txtThemeSearch)
             {
                 return;
             }
@@ -1640,8 +2261,8 @@ namespace DesktopClock
                 return;
             }
 
-            bool isCoreTab = (_tabs != null && _tabs.SelectedIndex == 1);
-            bool isBlockTab = (_tabs != null && _tabs.SelectedIndex == 2);
+            bool isCoreTab = (_tabs != null && _tabs.SelectedIndex == 2);
+            bool isBlockTab = (_tabs != null && _tabs.SelectedIndex == 3);
 
             if (!isCoreTab && !isBlockTab) return;
 
@@ -3113,6 +3734,390 @@ namespace DesktopClock
             }
         }
 
+
+        // ==========================================
+        // MODULES TAB (Weather & System Metrics)
+        // ==========================================
+        private CheckBox _chkWeatherEnabled;
+        private TextBox _txtWeatherCity;
+        private TextBox _txtWeatherLat;
+        private TextBox _txtWeatherLon;
+        private ComboBox _cmbWeatherUnit;
+        private ComboBox _cmbWeatherInterval;
+        private ComboBox _cmbWeatherPos;
+        private Button _btnRefreshWeather;
+
+        private CheckBox _chkMetricsEnabled;
+        private CheckBox _chkMetricsCpu;
+        private CheckBox _chkMetricsRam;
+        private ComboBox _cmbMetricsInterval;
+        private ComboBox _cmbMetricsPos;
+
+        private UIElement CreateModulesTab()
+        {
+            var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+            var root = new StackPanel { Margin = new Thickness(14) };
+
+            // --- SECTION 1: WEATHER MODULE ---
+            var grpWeather = CreateGroupBox("\u26C5 Weather Module");
+            var spW = new StackPanel { Margin = new Thickness(10) };
+
+            _chkWeatherEnabled = new CheckBox
+            {
+                Content = "Enable Weather Module",
+                IsChecked = _preview.Weather != null && _preview.Weather.Enabled,
+                Foreground = Brushes.White,
+                FontWeight = FontWeights.Bold,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            _chkWeatherEnabled.Checked += (s, e) => { _preview.Weather.Enabled = true; ApplyPreviewLive(); };
+            _chkWeatherEnabled.Unchecked += (s, e) => { _preview.Weather.Enabled = false; ApplyPreviewLive(); };
+            spW.Children.Add(_chkWeatherEnabled);
+
+            spW.Children.Add(new TextBlock { Text = "City / Location Name:", Foreground = Brushes.LightGray, Margin = new Thickness(0, 4, 0, 2) });
+            _txtWeatherCity = CreateTextBox(320);
+            _txtWeatherCity.Text = _preview.Weather != null ? _preview.Weather.CityName : "London";
+            _txtWeatherCity.TextChanged += (s, e) =>
+            {
+                if (_preview.Weather != null) { _preview.Weather.CityName = _txtWeatherCity.Text.Trim(); ApplyPreviewLive(); }
+            };
+            spW.Children.Add(_txtWeatherCity);
+
+            var spCoords = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 6) };
+            spCoords.Children.Add(new TextBlock { Text = "Lat: ", Foreground = Brushes.LightGray, VerticalAlignment = VerticalAlignment.Center });
+            _txtWeatherLat = CreateTextBox(100);
+            _txtWeatherLat.Text = (_preview.Weather != null ? _preview.Weather.Latitude : 51.5074).ToString(CultureInfo.InvariantCulture);
+            _txtWeatherLat.TextChanged += (s, e) =>
+            {
+                double val;
+                if (double.TryParse(_txtWeatherLat.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out val))
+                {
+                    _preview.Weather.Latitude = val; ApplyPreviewLive();
+                }
+            };
+            spCoords.Children.Add(_txtWeatherLat);
+
+            spCoords.Children.Add(new TextBlock { Text = "  Lon: ", Foreground = Brushes.LightGray, VerticalAlignment = VerticalAlignment.Center });
+            _txtWeatherLon = CreateTextBox(100);
+            _txtWeatherLon.Text = (_preview.Weather != null ? _preview.Weather.Longitude : -0.1278).ToString(CultureInfo.InvariantCulture);
+            _txtWeatherLon.TextChanged += (s, e) =>
+            {
+                double val;
+                if (double.TryParse(_txtWeatherLon.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out val))
+                {
+                    _preview.Weather.Longitude = val; ApplyPreviewLive();
+                }
+            };
+            spCoords.Children.Add(_txtWeatherLon);
+            spW.Children.Add(spCoords);
+
+            var spWOptions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 6) };
+            spWOptions.Children.Add(new TextBlock { Text = "Units: ", Foreground = Brushes.LightGray, VerticalAlignment = VerticalAlignment.Center });
+            _cmbWeatherUnit = CreateComboBox(110);
+            _cmbWeatherUnit.Items.Add("Celsius (\u00B0C)");
+            _cmbWeatherUnit.Items.Add("Fahrenheit (\u00B0F)");
+            _cmbWeatherUnit.SelectedIndex = (_preview.Weather != null && string.Equals(_preview.Weather.TemperatureUnit, "F", StringComparison.OrdinalIgnoreCase)) ? 1 : 0;
+            _cmbWeatherUnit.SelectionChanged += (s, e) =>
+            {
+                if (_preview.Weather != null)
+                {
+                    _preview.Weather.TemperatureUnit = _cmbWeatherUnit.SelectedIndex == 1 ? "F" : "C";
+                    ApplyPreviewLive();
+                }
+            };
+            spWOptions.Children.Add(_cmbWeatherUnit);
+
+            spWOptions.Children.Add(new TextBlock { Text = "   Interval: ", Foreground = Brushes.LightGray, VerticalAlignment = VerticalAlignment.Center });
+            _cmbWeatherInterval = CreateComboBox(120);
+            _cmbWeatherInterval.Items.Add("15 Minutes");
+            _cmbWeatherInterval.Items.Add("30 Minutes");
+            _cmbWeatherInterval.Items.Add("60 Minutes");
+            _cmbWeatherInterval.SelectedIndex = 1;
+            _cmbWeatherInterval.SelectionChanged += (s, e) =>
+            {
+                if (_preview.Weather != null)
+                {
+                    int m = _cmbWeatherInterval.SelectedIndex == 0 ? 15 : (_cmbWeatherInterval.SelectedIndex == 1 ? 30 : 60);
+                    _preview.Weather.UpdateIntervalMinutes = m;
+                    ApplyPreviewLive();
+                }
+            };
+            spWOptions.Children.Add(_cmbWeatherInterval);
+            spW.Children.Add(spWOptions);
+
+            var spWPos = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 6) };
+            spWPos.Children.Add(new TextBlock { Text = "Position: ", Foreground = Brushes.LightGray, VerticalAlignment = VerticalAlignment.Center });
+            _cmbWeatherPos = CreatePositionComboBox();
+            _cmbWeatherPos.SelectedItem = _preview.Weather != null ? _preview.Weather.Position : "Below Widget";
+            _cmbWeatherPos.SelectionChanged += (s, e) =>
+            {
+                if (_preview.Weather != null && _cmbWeatherPos.SelectedItem != null)
+                {
+                    _preview.Weather.Position = _cmbWeatherPos.SelectedItem.ToString();
+                    ApplyPreviewLive();
+                }
+            };
+            spWPos.Children.Add(_cmbWeatherPos);
+
+            _btnRefreshWeather = CreateStyledButton("Refresh Now", 100);
+            _btnRefreshWeather.Margin = new Thickness(14, 0, 0, 0);
+            _btnRefreshWeather.Click += (s, e) =>
+            {
+                if (_preview.Weather != null)
+                {
+                    WeatherService.FetchWeatherAsync(_preview.Weather, null);
+                    ApplyPreviewLive();
+                }
+            };
+            spWPos.Children.Add(_btnRefreshWeather);
+            spW.Children.Add(spWPos);
+
+            grpWeather.Content = spW;
+            root.Children.Add(grpWeather);
+
+            // --- SECTION 2: SYSTEM METRICS MODULE ---
+            var grpMetrics = CreateGroupBox("\u2261 System Metrics (CPU & RAM)");
+            var spM = new StackPanel { Margin = new Thickness(10) };
+
+            _chkMetricsEnabled = new CheckBox
+            {
+                Content = "Enable System Metrics",
+                IsChecked = _preview.Metrics != null && _preview.Metrics.Enabled,
+                Foreground = Brushes.White,
+                FontWeight = FontWeights.Bold,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            _chkMetricsEnabled.Checked += (s, e) => { _preview.Metrics.Enabled = true; ApplyPreviewLive(); };
+            _chkMetricsEnabled.Unchecked += (s, e) => { _preview.Metrics.Enabled = false; ApplyPreviewLive(); };
+            spM.Children.Add(_chkMetricsEnabled);
+
+            var spMChecks = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 6) };
+            _chkMetricsCpu = new CheckBox { Content = "Show CPU %", IsChecked = _preview.Metrics != null && _preview.Metrics.ShowCpu, Foreground = Brushes.LightGray, Margin = new Thickness(0, 0, 16, 0) };
+            _chkMetricsCpu.Checked += (s, e) => { _preview.Metrics.ShowCpu = true; ApplyPreviewLive(); };
+            _chkMetricsCpu.Unchecked += (s, e) => { _preview.Metrics.ShowCpu = false; ApplyPreviewLive(); };
+            spMChecks.Children.Add(_chkMetricsCpu);
+
+            _chkMetricsRam = new CheckBox { Content = "Show RAM Usage (GB & %)", IsChecked = _preview.Metrics != null && _preview.Metrics.ShowRam, Foreground = Brushes.LightGray };
+            _chkMetricsRam.Checked += (s, e) => { _preview.Metrics.ShowRam = true; ApplyPreviewLive(); };
+            _chkMetricsRam.Unchecked += (s, e) => { _preview.Metrics.ShowRam = false; ApplyPreviewLive(); };
+            spMChecks.Children.Add(_chkMetricsRam);
+            spM.Children.Add(spMChecks);
+
+            var spMOptions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 6) };
+            spMOptions.Children.Add(new TextBlock { Text = "Update Rate: ", Foreground = Brushes.LightGray, VerticalAlignment = VerticalAlignment.Center });
+            _cmbMetricsInterval = CreateComboBox(110);
+            _cmbMetricsInterval.Items.Add("1 Second");
+            _cmbMetricsInterval.Items.Add("2 Seconds");
+            _cmbMetricsInterval.Items.Add("5 Seconds");
+            _cmbMetricsInterval.SelectedIndex = (_preview.Metrics != null && _preview.Metrics.UpdateIntervalSeconds == 1) ? 0 : ((_preview.Metrics != null && _preview.Metrics.UpdateIntervalSeconds == 5) ? 2 : 1);
+            _cmbMetricsInterval.SelectionChanged += (s, e) =>
+            {
+                if (_preview.Metrics != null)
+                {
+                    int sec = _cmbMetricsInterval.SelectedIndex == 0 ? 1 : (_cmbMetricsInterval.SelectedIndex == 2 ? 5 : 2);
+                    _preview.Metrics.UpdateIntervalSeconds = sec;
+                    ApplyPreviewLive();
+                }
+            };
+            spMOptions.Children.Add(_cmbMetricsInterval);
+
+            spMOptions.Children.Add(new TextBlock { Text = "   Position: ", Foreground = Brushes.LightGray, VerticalAlignment = VerticalAlignment.Center });
+            _cmbMetricsPos = CreatePositionComboBox();
+            _cmbMetricsPos.SelectedItem = _preview.Metrics != null ? _preview.Metrics.Position : "Below Widget";
+            _cmbMetricsPos.SelectionChanged += (s, e) =>
+            {
+                if (_preview.Metrics != null && _cmbMetricsPos.SelectedItem != null)
+                {
+                    _preview.Metrics.Position = _cmbMetricsPos.SelectedItem.ToString();
+                    ApplyPreviewLive();
+                }
+            };
+            spMOptions.Children.Add(_cmbMetricsPos);
+            spM.Children.Add(spMOptions);
+
+            grpMetrics.Content = spM;
+            root.Children.Add(grpMetrics);
+
+            scroll.Content = root;
+            return scroll;
+        }
+
+        // ==========================================
+        // TIMEZONES TAB (Secondary Clocks)
+        // ==========================================
+        private ListBox _lstTimezones;
+        private Button _btnAddTimezone;
+        private Button _btnDeleteTimezone;
+
+        private UIElement CreateTimezonesTab()
+        {
+            var root = new Grid { Margin = new Thickness(14) };
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var desc = new TextBlock
+            {
+                Text = "Configure secondary world clocks for remote offices, travel, or friends with automatic Daylight Saving Time.",
+                Foreground = Brushes.LightGray,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 10)
+            };
+            Grid.SetRow(desc, 0);
+            root.Children.Add(desc);
+
+            _lstTimezones = new ListBox
+            {
+                Background = new SolidColorBrush(Color.FromRgb(28, 30, 34)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(50, 52, 58)),
+                Foreground = Brushes.White
+            };
+            Grid.SetRow(_lstTimezones, 1);
+            root.Children.Add(_lstTimezones);
+
+            var btnBar = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 10, 0, 0)
+            };
+
+            _btnAddTimezone = CreateStyledButton("Add Timezone", 110);
+            _btnAddTimezone.Click += (s, e) => ShowAddTimezoneDialog();
+            btnBar.Children.Add(_btnAddTimezone);
+
+            _btnDeleteTimezone = CreateStyledButton("Delete", 80);
+            _btnDeleteTimezone.Margin = new Thickness(8, 0, 0, 0);
+            _btnDeleteTimezone.Click += (s, e) =>
+            {
+                if (_lstTimezones.SelectedIndex >= 0 && _preview.Timezones != null && _lstTimezones.SelectedIndex < _preview.Timezones.Count)
+                {
+                    _preview.Timezones.RemoveAt(_lstTimezones.SelectedIndex);
+                    RefreshTimezonesList();
+                    ApplyPreviewLive();
+                }
+            };
+            btnBar.Children.Add(_btnDeleteTimezone);
+
+            Grid.SetRow(btnBar, 2);
+            root.Children.Add(btnBar);
+
+            RefreshTimezonesList();
+            return root;
+        }
+
+        private void RefreshTimezonesList()
+        {
+            if (_lstTimezones == null) return;
+            _lstTimezones.Items.Clear();
+            if (_preview.Timezones == null) return;
+
+            foreach (var tz in _preview.Timezones)
+            {
+                var sp = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(4) };
+                var chk = new CheckBox { IsChecked = tz.Enabled, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
+                var capturedTz = tz;
+                chk.Checked += (s, e) => { capturedTz.Enabled = true; ApplyPreviewLive(); };
+                chk.Unchecked += (s, e) => { capturedTz.Enabled = false; ApplyPreviewLive(); };
+                sp.Children.Add(chk);
+
+                var txt = new TextBlock
+                {
+                    Text = string.Format("{0} [{1}] ({2})", tz.CustomLabel, tz.TimeZoneId, tz.Position),
+                    Foreground = Brushes.White,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                sp.Children.Add(txt);
+                _lstTimezones.Items.Add(sp);
+            }
+        }
+
+        private void ShowAddTimezoneDialog()
+        {
+            var win = new Window
+            {
+                Title = "Add Secondary Timezone Clock",
+                Width = 460,
+                Height = 310,
+                Owner = this,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                ResizeMode = ResizeMode.NoResize,
+                Background = new SolidColorBrush(Color.FromRgb(32, 34, 37)),
+                Foreground = Brushes.White,
+                ShowInTaskbar = false
+            };
+
+            var root = new StackPanel { Margin = new Thickness(14) };
+
+            root.Children.Add(new TextBlock { Text = "Custom Label (e.g. Tokyo, London, Home):", FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 4) });
+            var txtLabel = CreateTextBox(400);
+            txtLabel.Text = "Tokyo";
+            root.Children.Add(txtLabel);
+
+            root.Children.Add(new TextBlock { Text = "Select System Timezone:", FontWeight = FontWeights.Bold, Margin = new Thickness(0, 8, 0, 4) });
+            var cmbTz = CreateComboBox(400);
+            var systemZones = TimeZoneInfo.GetSystemTimeZones();
+            int defaultIdx = 0;
+            for (int i = 0; i < systemZones.Count; i++)
+            {
+                var z = systemZones[i];
+                cmbTz.Items.Add(string.Format("{0} ({1})", z.DisplayName, z.Id));
+                if (z.Id.IndexOf("Tokyo", StringComparison.OrdinalIgnoreCase) >= 0) defaultIdx = i;
+            }
+            cmbTz.SelectedIndex = defaultIdx;
+            root.Children.Add(cmbTz);
+
+            var chk24h = new CheckBox { Content = "Use 24-Hour Format", IsChecked = false, Foreground = Brushes.White, Margin = new Thickness(0, 10, 0, 6) };
+            root.Children.Add(chk24h);
+
+            var btnPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 16, 0, 0) };
+
+            var btnAdd = CreateStyledButton("Add", 80);
+            btnAdd.IsDefault = true;
+            btnAdd.Click += (s, e) =>
+            {
+                string lbl = txtLabel.Text.Trim();
+                if (string.IsNullOrEmpty(lbl)) lbl = "Timezone";
+                int selIdx = cmbTz.SelectedIndex;
+                string tzId = (selIdx >= 0 && selIdx < systemZones.Count) ? systemZones[selIdx].Id : "UTC";
+
+                var item = new TimezoneItem(tzId, lbl, chk24h.IsChecked == true);
+                if (_preview.Timezones == null) _preview.Timezones = new List<TimezoneItem>();
+                _preview.Timezones.Add(item);
+
+                RefreshTimezonesList();
+                ApplyPreviewLive();
+                win.Close();
+            };
+
+            var btnCancel = CreateStyledButton("Cancel", 80);
+            btnCancel.IsCancel = true;
+            btnCancel.Click += (s, e) => win.Close();
+
+            btnPanel.Children.Add(btnAdd);
+            btnPanel.Children.Add(btnCancel);
+            root.Children.Add(btnPanel);
+
+            win.Content = root;
+            win.ShowDialog();
+        }
+
+        private ComboBox CreatePositionComboBox()
+        {
+            var cmb = CreateComboBox(140);
+            cmb.Items.Add("Above Widget");
+            cmb.Items.Add("Below Widget");
+            cmb.Items.Add("Above Greeting");
+            cmb.Items.Add("Below Greeting");
+            cmb.Items.Add("Above Weekday");
+            cmb.Items.Add("Below Weekday");
+            cmb.Items.Add("Above Time");
+            cmb.Items.Add("Below Time");
+            cmb.Items.Add("Above Date");
+            cmb.Items.Add("Below Date");
+            return cmb;
+        }
+
         private UIElement CreatePositionTab()
         {
             var root = new StackPanel { Margin = new Thickness(12) };
@@ -3213,6 +4218,7 @@ namespace DesktopClock
                 LoadSelectedCoreElementValues();
                 RefreshBlocksList();
                 PopulateCatalogList();
+                PopulateThemesList();
 
                 _chkRunOnStartup.IsChecked = _preview.RunOnStartup;
                 UpdatePositionButtons();

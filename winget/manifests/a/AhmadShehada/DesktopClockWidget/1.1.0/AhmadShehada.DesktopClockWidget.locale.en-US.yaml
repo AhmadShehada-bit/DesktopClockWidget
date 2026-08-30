@@ -1,0 +1,42 @@
+# Created using wingetcreate 1.6.0
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
+
+PackageIdentifier: AhmadShehada.DesktopClockWidget
+PackageVersion: 1.1.0
+PackageLocale: en-US
+Publisher: Ahmad Shehada
+PublisherUrl: https://github.com/AhmadShehada-bit
+PublisherSupportUrl: https://github.com/AhmadShehada-bit/DesktopClockWidget/issues
+Author: Ahmad Shehada
+PackageName: DesktopClock Widget
+PackageUrl: https://github.com/AhmadShehada-bit/DesktopClockWidget
+License: MIT
+LicenseUrl: https://github.com/AhmadShehada-bit/DesktopClockWidget/blob/main/LICENSE
+PrivacyUrl: https://github.com/AhmadShehada-bit/DesktopClockWidget/blob/main/PRIVACY.md
+Copyright: Copyright (c) 2026 Ahmad Shehada
+CopyrightUrl: https://github.com/AhmadShehada-bit/DesktopClockWidget/blob/main/LICENSE
+ShortDescription: A lightweight, highly customizable Windows desktop clock widget with aesthetic themes, weather, system metrics, and world timezones.
+Description: |
+  DesktopClock Widget is an ultra-lightweight, customizable desktop clock for Windows 10 and 11.
+  Features:
+  - 10 curated aesthetic themes (Cyberpunk, Minimalist, Serif, Handwritten, HUD, Neon)
+  - Zero-visual-jitter dynamic text envelopes for seamless second/minute/date updates
+  - 217+ curated bundled fonts with fast mouse-wheel font browsing and LRU caching
+  - Optional lightweight modules (Open-Meteo weather with offline caching, CPU & RAM metrics)
+  - Secondary world timezone clocks with automatic DST conversion
+  - Multi-monitor placement and Per-Monitor DPI scaling awareness
+  - Pure native WPF + Win32 architecture with zero telemetry and zero WebView2/Chromium overhead
+Moniker: desktopclock
+Tags:
+  - clock
+  - desktop
+  - widget
+  - aesthetic
+  - productivity
+  - weather
+  - hardware-monitor
+  - timezone
+  - customization
+  - wpf
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0
