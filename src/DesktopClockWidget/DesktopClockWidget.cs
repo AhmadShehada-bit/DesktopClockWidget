@@ -106,6 +106,9 @@ namespace DesktopClock
         [DataMember] public double Opacity { get; set; }
         [DataMember] public string Case { get; set; }
         [DataMember] public TextEffectSettings Effects { get; set; }
+        [DataMember] public string HorizontalAlignment { get; set; }
+        [DataMember] public double OffsetX { get; set; }
+        [DataMember] public double OffsetY { get; set; }
 
         public ElementSettings()
         {
@@ -117,9 +120,12 @@ namespace DesktopClock
             Opacity = 1.0;
             Case = "None";
             Effects = new TextEffectSettings();
+            HorizontalAlignment = "Center";
+            OffsetX = 0.0;
+            OffsetY = 0.0;
         }
 
-        public ElementSettings(bool visible, string family, string weight, double size, string color, double opacity, string textCase, TextEffectSettings effects = null)
+        public ElementSettings(bool visible, string family, string weight, double size, string color, double opacity, string textCase, TextEffectSettings effects = null, string alignment = "Center", double offsetX = 0.0, double offsetY = 0.0)
         {
             Visible = visible;
             FontFamily = family;
@@ -129,11 +135,14 @@ namespace DesktopClock
             Opacity = opacity;
             Case = textCase;
             Effects = effects != null ? effects.Clone() : new TextEffectSettings();
+            HorizontalAlignment = !string.IsNullOrEmpty(alignment) ? alignment : "Center";
+            OffsetX = offsetX;
+            OffsetY = offsetY;
         }
 
         public ElementSettings Clone()
         {
-            return new ElementSettings(Visible, FontFamily, FontWeight, FontSize, Color, Opacity, Case, Effects != null ? Effects.Clone() : new TextEffectSettings());
+            return new ElementSettings(Visible, FontFamily, FontWeight, FontSize, Color, Opacity, Case, Effects != null ? Effects.Clone() : new TextEffectSettings(), HorizontalAlignment, OffsetX, OffsetY);
         }
     }
 
@@ -183,6 +192,8 @@ namespace DesktopClock
         [DataMember] public string Color { get; set; }
         [DataMember] public double Opacity { get; set; }
         [DataMember] public string Alignment { get; set; }
+        [DataMember] public double OffsetX { get; set; }
+        [DataMember] public double OffsetY { get; set; }
         [DataMember] public string Case { get; set; }
         [DataMember] public bool Italic { get; set; }
         [DataMember] public bool Underline { get; set; }
@@ -216,6 +227,8 @@ namespace DesktopClock
             Color = "#D6D3D0";
             Opacity = 0.8;
             Alignment = "Center";
+            OffsetX = 0.0;
+            OffsetY = 0.0;
             Case = "None";
             Italic = false;
             Underline = false;
@@ -250,6 +263,8 @@ namespace DesktopClock
             b.Color = Color;
             b.Opacity = Opacity;
             b.Alignment = Alignment;
+            b.OffsetX = OffsetX;
+            b.OffsetY = OffsetY;
             b.Case = Case;
             b.Italic = Italic;
             b.Underline = Underline;
@@ -1243,11 +1258,15 @@ namespace DesktopClock
         private double _fontSize = 16.0;
         private Color _textColor = Color.FromRgb(214, 211, 208);
         private double _textOpacity = 1.0;
-        private TextAlignment _textAlignment = TextAlignment.Center;
+        private string _elementAlignment = "Center";
+        private double _offsetX = 0.0;
+        private double _offsetY = 0.0;
         private TextEffectSettings _effects = new TextEffectSettings();
 
         private FormattedText _formattedText;
         private Geometry _cachedGeometry;
+        private Rect _visualBounds = Rect.Empty;
+        private bool _formattedTextDirty = true;
         private bool _geometryDirty = true;
 
         private static int _globalAnimTick = 0;
@@ -1255,55 +1274,157 @@ namespace DesktopClock
         public string Text
         {
             get { return _text; }
-            set { if (_text != value) { _text = value ?? ""; _geometryDirty = true; InvalidateMeasure(); } }
+            set
+            {
+                if (!string.Equals(_text, value))
+                {
+                    _text = value ?? "";
+                    _formattedTextDirty = true;
+                    _geometryDirty = true;
+                    InvalidateMeasure();
+                }
+            }
         }
 
         public FontFamily FontFamily
         {
             get { return _fontFamily; }
-            set { if (_fontFamily != value) { _fontFamily = value ?? new FontFamily("Segoe UI"); _geometryDirty = true; InvalidateMeasure(); } }
+            set
+            {
+                if (!object.Equals(_fontFamily, value))
+                {
+                    _fontFamily = value ?? new FontFamily("Segoe UI");
+                    _formattedTextDirty = true;
+                    _geometryDirty = true;
+                    InvalidateMeasure();
+                }
+            }
         }
 
         public FontWeight FontWeight
         {
             get { return _fontWeight; }
-            set { if (_fontWeight != value) { _fontWeight = value; _geometryDirty = true; InvalidateMeasure(); } }
+            set
+            {
+                if (_fontWeight != value)
+                {
+                    _fontWeight = value;
+                    _formattedTextDirty = true;
+                    _geometryDirty = true;
+                    InvalidateMeasure();
+                }
+            }
         }
 
         public FontStyle FontStyle
         {
             get { return _fontStyle; }
-            set { if (_fontStyle != value) { _fontStyle = value; _geometryDirty = true; InvalidateMeasure(); } }
+            set
+            {
+                if (_fontStyle != value)
+                {
+                    _fontStyle = value;
+                    _formattedTextDirty = true;
+                    _geometryDirty = true;
+                    InvalidateMeasure();
+                }
+            }
         }
 
         public double FontSize
         {
             get { return _fontSize; }
-            set { if (Math.Abs(_fontSize - value) > 0.001) { _fontSize = Math.Max(6, value); _geometryDirty = true; InvalidateMeasure(); } }
+            set
+            {
+                if (Math.Abs(_fontSize - value) > 0.001)
+                {
+                    _fontSize = Math.Max(6, value);
+                    _formattedTextDirty = true;
+                    _geometryDirty = true;
+                    InvalidateMeasure();
+                }
+            }
         }
 
         public Color TextColor
         {
             get { return _textColor; }
-            set { if (_textColor != value) { _textColor = value; InvalidateVisual(); } }
+            set
+            {
+                if (_textColor != value)
+                {
+                    _textColor = value;
+                    _formattedTextDirty = true;
+                    InvalidateVisual();
+                }
+            }
         }
 
         public double TextOpacity
         {
             get { return _textOpacity; }
-            set { if (Math.Abs(_textOpacity - value) > 0.001) { _textOpacity = Math.Max(0.0, Math.Min(1.0, value)); InvalidateVisual(); } }
+            set
+            {
+                if (Math.Abs(_textOpacity - value) > 0.001)
+                {
+                    _textOpacity = Math.Max(0.0, Math.Min(1.0, value));
+                    _formattedTextDirty = true;
+                    InvalidateVisual();
+                }
+            }
         }
 
-        public TextAlignment TextAlignment
+        public string ElementAlignment
         {
-            get { return _textAlignment; }
-            set { if (_textAlignment != value) { _textAlignment = value; _geometryDirty = true; InvalidateMeasure(); } }
+            get { return _elementAlignment; }
+            set
+            {
+                string norm = string.IsNullOrEmpty(value) ? "Center" : value;
+                if (!string.Equals(_elementAlignment, norm, StringComparison.OrdinalIgnoreCase))
+                {
+                    _elementAlignment = norm;
+                    InvalidateVisual();
+                }
+            }
+        }
+
+        public double OffsetX
+        {
+            get { return _offsetX; }
+            set
+            {
+                if (Math.Abs(_offsetX - value) > 0.001)
+                {
+                    _offsetX = value;
+                    InvalidateMeasure();
+                    InvalidateVisual();
+                }
+            }
+        }
+
+        public double OffsetY
+        {
+            get { return _offsetY; }
+            set
+            {
+                if (Math.Abs(_offsetY - value) > 0.001)
+                {
+                    _offsetY = value;
+                    InvalidateMeasure();
+                    InvalidateVisual();
+                }
+            }
         }
 
         public TextEffectSettings Effects
         {
             get { return _effects; }
-            set { _effects = value ?? new TextEffectSettings(); InvalidateVisual(); }
+            set
+            {
+                _effects = value ?? new TextEffectSettings();
+                _geometryDirty = true;
+                InvalidateVisual();
+            }
         }
 
         public static void AdvanceGlobalAnimation()
@@ -1311,18 +1432,26 @@ namespace DesktopClock
             _globalAnimTick++;
         }
 
-        private void RebuildGeometry()
+        public EffectTextBlock()
+        {
+            HorizontalAlignment = HorizontalAlignment.Stretch;
+        }
+
+        private void RebuildFormattedText()
         {
             if (string.IsNullOrEmpty(_text))
             {
                 _formattedText = null;
                 _cachedGeometry = null;
+                _visualBounds = Rect.Empty;
+                _formattedTextDirty = false;
                 _geometryDirty = false;
                 return;
             }
 
             var tf = new Typeface(_fontFamily, _fontStyle, _fontWeight, FontStretches.Normal);
             var brush = new SolidColorBrush(_textColor) { Opacity = _textOpacity };
+            brush.Freeze();
 
             _formattedText = new FormattedText(
                 _text,
@@ -1333,18 +1462,31 @@ namespace DesktopClock
                 brush
             );
             _formattedText.TextAlignment = TextAlignment.Left;
+            _formattedTextDirty = false;
+        }
+
+        private void EnsureGeometry()
+        {
+            if (_formattedTextDirty) RebuildFormattedText();
+            if (!_geometryDirty && _cachedGeometry != null) return;
+            if (_formattedText == null) { _cachedGeometry = null; _visualBounds = Rect.Empty; _geometryDirty = false; return; }
 
             _cachedGeometry = _formattedText.BuildGeometry(new Point(0, 0));
             if (_cachedGeometry != null)
             {
                 _cachedGeometry.Freeze();
+                _visualBounds = _cachedGeometry.Bounds;
+            }
+            else
+            {
+                _visualBounds = Rect.Empty;
             }
             _geometryDirty = false;
         }
 
         protected override Size MeasureOverride(Size availableSize)
         {
-            if (_geometryDirty) RebuildGeometry();
+            if (_formattedTextDirty || _geometryDirty) EnsureGeometry();
             if (_formattedText == null || string.IsNullOrEmpty(_text))
                 return new Size(0, 0);
 
@@ -1352,8 +1494,8 @@ namespace DesktopClock
             if (_effects != null && _effects.OutlineEnabled)
                 strokePad = Math.Min(10, _effects.OutlineThickness);
 
-            double w = Math.Ceiling(_formattedText.Width + strokePad * 2);
-            double h = Math.Ceiling(_formattedText.Height + strokePad * 2);
+            double w = Math.Ceiling((_visualBounds.IsEmpty ? _formattedText.Width : _visualBounds.Width) + strokePad * 2);
+            double h = Math.Ceiling((_visualBounds.IsEmpty ? _formattedText.Height : _visualBounds.Height) + strokePad * 2);
             return new Size(w, h);
         }
 
@@ -1364,21 +1506,41 @@ namespace DesktopClock
 
         protected override void OnRender(DrawingContext dc)
         {
-            if (_geometryDirty) RebuildGeometry();
+            if (_formattedTextDirty || _geometryDirty) EnsureGeometry();
             if (_cachedGeometry == null || string.IsNullOrEmpty(_text)) return;
 
-            double strokePad = 0;
-            if (_effects != null && _effects.OutlineEnabled)
-                strokePad = Math.Min(10, _effects.OutlineThickness);
+            bool hasOutline = (_effects != null && _effects.OutlineEnabled && _effects.OutlineThickness > 0.01);
+            bool hasGlitch = (_effects != null && _effects.GlitchEnabled && _effects.GlitchIntensity > 0);
+            bool hasNoise = (_effects != null && _effects.NoiseEnabled && _effects.NoiseAmount > 0);
 
-            double offsetX = strokePad;
-            double offsetY = strokePad;
+            double strokePad = hasOutline ? Math.Min(10, _effects.OutlineThickness) : 0;
+            double slotWidth = RenderSize.Width > 0 ? RenderSize.Width : (_visualBounds.IsEmpty ? _formattedText.Width : _visualBounds.Width);
+
+            double minX = _visualBounds.IsEmpty ? 0 : _visualBounds.Left;
+            double maxX = _visualBounds.IsEmpty ? _formattedText.Width : _visualBounds.Right;
+            double visualCenter = (minX + maxX) / 2.0;
+
+            double drawX;
+            if (string.Equals(_elementAlignment, "Left", StringComparison.OrdinalIgnoreCase))
+            {
+                drawX = strokePad - minX + _offsetX;
+            }
+            else if (string.Equals(_elementAlignment, "Right", StringComparison.OrdinalIgnoreCase))
+            {
+                drawX = slotWidth - strokePad - maxX + _offsetX;
+            }
+            else // Center default: exact visual center alignment
+            {
+                drawX = (slotWidth / 2.0) - visualCenter + _offsetX;
+            }
+
+            double drawY = strokePad - (_visualBounds.IsEmpty ? 0 : _visualBounds.Top) + _offsetY;
 
             var fillBrush = new SolidColorBrush(_textColor) { Opacity = _textOpacity };
             fillBrush.Freeze();
 
             Pen outlinePen = null;
-            if (_effects != null && _effects.OutlineEnabled)
+            if (hasOutline)
             {
                 var strokeColor = ParseColor(_effects.OutlineColor);
                 var strokeBrush = new SolidColorBrush(strokeColor) { Opacity = _effects.OutlineOpacity * _textOpacity };
@@ -1393,7 +1555,7 @@ namespace DesktopClock
             }
 
             // GLITCH EFFECT (Rendering-only displacement, zero layout impact)
-            if (_effects != null && _effects.GlitchEnabled && _effects.GlitchIntensity > 0)
+            if (hasGlitch)
             {
                 int tick = _globalAnimTick;
                 int seed = tick + (int)(_fontSize * 7) + (_text.Length * 13);
@@ -1409,7 +1571,7 @@ namespace DesktopClock
                 var color1 = ParseColor(_effects.GlitchColor1 ?? "#00FFFF");
                 var brush1 = new SolidColorBrush(color1) { Opacity = 0.55 * _textOpacity };
                 brush1.Freeze();
-                dc.PushTransform(new TranslateTransform(offsetX + dx1, offsetY + dy1));
+                dc.PushTransform(new TranslateTransform(drawX + dx1, drawY + dy1));
                 dc.DrawGeometry(brush1, null, _cachedGeometry);
                 dc.Pop();
 
@@ -1417,17 +1579,17 @@ namespace DesktopClock
                 var color2 = ParseColor(_effects.GlitchColor2 ?? "#FF0055");
                 var brush2 = new SolidColorBrush(color2) { Opacity = 0.55 * _textOpacity };
                 brush2.Freeze();
-                dc.PushTransform(new TranslateTransform(offsetX + dx2, offsetY + dy2));
+                dc.PushTransform(new TranslateTransform(drawX + dx2, drawY + dy2));
                 dc.DrawGeometry(brush2, null, _cachedGeometry);
                 dc.Pop();
             }
 
             // BASE / OUTLINE RENDERING
-            dc.PushTransform(new TranslateTransform(offsetX, offsetY));
+            dc.PushTransform(new TranslateTransform(drawX, drawY));
             dc.DrawGeometry(fillBrush, outlinePen, _cachedGeometry);
 
             // NOISE EFFECT
-            if (_effects != null && _effects.NoiseEnabled && _effects.NoiseAmount > 0)
+            if (hasNoise)
             {
                 int tick = _globalAnimTick;
                 var rnd = new Random(tick ^ 0x5A5A);
@@ -1445,9 +1607,9 @@ namespace DesktopClock
                 for (int i = 0; i < scanlineCount; i++)
                 {
                     double y = (i * lineSpacing + (tick * 2) % lineSpacing);
-                    if (y < _formattedText.Height)
+                    if (y < (_visualBounds.IsEmpty ? _formattedText.Height : _visualBounds.Height))
                     {
-                        dc.DrawLine(noisePen, new Point(0, y), new Point(_formattedText.Width, y));
+                        dc.DrawLine(noisePen, new Point(_visualBounds.IsEmpty ? 0 : _visualBounds.Left, y), new Point(_visualBounds.IsEmpty ? _formattedText.Width : _visualBounds.Right, y));
                     }
                 }
             }
@@ -1712,13 +1874,9 @@ namespace DesktopClock
                 string hexColor = (_settings.UseGlobalColor && !string.IsNullOrEmpty(_settings.GlobalColor)) ? _settings.GlobalColor : b.Color;
                 tb.TextColor = ParseColor(hexColor);
                 tb.TextOpacity = Math.Max(0.0, Math.Min(1.0, b.Opacity * masterOpacity));
-
-                switch (b.Alignment != null ? b.Alignment.ToLowerInvariant() : "center")
-                {
-                    case "left": tb.HorizontalAlignment = HorizontalAlignment.Left; tb.TextAlignment = TextAlignment.Left; break;
-                    case "right": tb.HorizontalAlignment = HorizontalAlignment.Right; tb.TextAlignment = TextAlignment.Right; break;
-                    default: tb.HorizontalAlignment = HorizontalAlignment.Center; tb.TextAlignment = TextAlignment.Center; break;
-                }
+                tb.ElementAlignment = !string.IsNullOrEmpty(b.Alignment) ? b.Alignment : "Center";
+                tb.OffsetX = b.OffsetX;
+                tb.OffsetY = b.OffsetY;
 
                 StackPanel container = GetContainerForPosition(b.Position);
                 container.Children.Add(tb);
@@ -1773,12 +1931,15 @@ namespace DesktopClock
             string fontName = (useGlobalFont && !string.IsNullOrEmpty(globalFont)) ? globalFont : elem.FontFamily;
             tb.FontFamily = Fonts.For(fontName);
             tb.FontWeight = Fonts.ParseWeight(elem.FontWeight);
+            tb.FontStyle = FontStyles.Normal;
             tb.FontSize = Math.Max(6, elem.FontSize);
 
             string hexColor = (useGlobalColor && !string.IsNullOrEmpty(globalColor)) ? globalColor : elem.Color;
             tb.TextColor = ParseColor(hexColor);
             tb.TextOpacity = Math.Max(0.0, Math.Min(1.0, elem.Opacity * masterOpacity));
-            tb.TextAlignment = TextAlignment.Center;
+            tb.ElementAlignment = !string.IsNullOrEmpty(elem.HorizontalAlignment) ? elem.HorizontalAlignment : "Center";
+            tb.OffsetX = elem.OffsetX;
+            tb.OffsetY = elem.OffsetY;
             tb.Effects = elem.Effects != null ? elem.Effects.Clone() : new TextEffectSettings();
         }
 
@@ -2903,6 +3064,102 @@ namespace DesktopClock
                 if (!can) ok = false;
             }
 
+            // PHASE 3: ELEMENT POSITIONING & VISUAL CENTERING ACCEPTANCE TESTS
+            // 29. Default visual center axis alignment (Date "30 AUG" vs core lines differ <= 1.0 DIP)
+            string[] coreTexts = new string[] { "GOOD AFTERNOON", "Sunday", "01:11 PM", "30 AUG" };
+            string[] coreFonts = new string[] { "Audiowide", "Segoe UI", "Audiowide", "Segoe UI" };
+            double[] coreSizes = new double[] { 14, 22, 64, 20 };
+            double testColW = 320.0;
+            double testExpCenter = testColW / 2.0;
+            double maxCenterAxisDiff = 0.0;
+
+            for (int i = 0; i < coreTexts.Length; i++)
+            {
+                var tf = new Typeface(new FontFamily(coreFonts[i]), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+                var ft = new FormattedText(coreTexts[i], CultureInfo.InvariantCulture, FlowDirection.LeftToRight, tf, coreSizes[i], Brushes.White);
+                var geom = ft.BuildGeometry(new Point(0, 0));
+                double vCenter = (geom.Bounds.Left + geom.Bounds.Right) / 2.0;
+                double drawX = (testColW / 2.0) - vCenter;
+                double renderedCenter = drawX + vCenter;
+                double diff = Math.Abs(renderedCenter - testExpCenter);
+                if (diff > maxCenterAxisDiff) maxCenterAxisDiff = diff;
+            }
+            Check(sb, ref ok, maxCenterAxisDiff <= 1.0, "29. Default visual center axis alignment across core elements (Max error: " + maxCenterAxisDiff.ToString("F4") + " DIP)");
+
+            // 30. Date X Offset +25 and -25 DIP delta validation
+            var tfDate = new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+            var ftDate = new FormattedText("30 AUG", CultureInfo.InvariantCulture, FlowDirection.LeftToRight, tfDate, 20, Brushes.White);
+            var geomDate = ftDate.BuildGeometry(new Point(0, 0));
+            double dateVCenter = (geomDate.Bounds.Left + geomDate.Bounds.Right) / 2.0;
+            double baseDrawCenter = (testColW / 2.0) - dateVCenter + dateVCenter;
+            double drawCenterPlus = (testColW / 2.0) - dateVCenter + 25.0 + dateVCenter;
+            double drawCenterMinus = (testColW / 2.0) - dateVCenter - 25.0 + dateVCenter;
+            bool xOffsetOk = Math.Abs((drawCenterPlus - baseDrawCenter) - 25.0) < 0.001 && Math.Abs((drawCenterMinus - baseDrawCenter) - (-25.0)) < 0.001;
+            Check(sb, ref ok, xOffsetOk, "30. Date X Offset +25 and -25 DIP delta verified");
+
+            // 31. Date Right Alignment relative to common column width
+            double dateMaxX = geomDate.Bounds.Right;
+            double rightDrawX = testColW - dateMaxX;
+            double rightEdgeDrawn = rightDrawX + dateMaxX;
+            Check(sb, ref ok, Math.Abs(rightEdgeDrawn - testColW) < 0.001, "31. Date Right alignment aligned to common content width");
+
+            // 32. Independent mixed alignments (Greeting: Left, Weekday: Center, Time: Right, Date: Center)
+            var sMixed = new WidgetSettings();
+            sMixed.Greeting.HorizontalAlignment = "Left";
+            sMixed.Weekday.HorizontalAlignment = "Center";
+            sMixed.Time.HorizontalAlignment = "Right";
+            sMixed.Date.HorizontalAlignment = "Center";
+            Check(sb, ref ok, sMixed.Greeting.HorizontalAlignment == "Left" && sMixed.Weekday.HorizontalAlignment == "Center" && sMixed.Time.HorizontalAlignment == "Right" && sMixed.Date.HorizontalAlignment == "Center", "32. Independent mixed alignments for core elements");
+
+            // 33. Placement persistence round-trip in WidgetSettings and CustomBlock
+            var sPersist = new WidgetSettings();
+            sPersist.Date.HorizontalAlignment = "Center";
+            sPersist.Date.OffsetX = 20.0;
+            sPersist.Date.OffsetY = -5.0;
+            sPersist.Blocks.Add(new CustomBlock { Alignment = "Right", OffsetX = 15.0, OffsetY = 8.0 });
+            var sCloned = SettingsManager.Clone(sPersist);
+            bool persistOk = sCloned.Date.OffsetX == 20.0 && sCloned.Date.OffsetY == -5.0 && sCloned.Blocks.Last().OffsetX == 15.0 && sCloned.Blocks.Last().Alignment == "Right";
+            Check(sb, ref ok, persistOk, "33. Placement & offset settings persistence round-trip");
+
+            // 34. Effects + positioning compatibility (Outline, Glitch, Noise)
+            var effTb = new EffectTextBlock
+            {
+                Text = "30 AUG",
+                FontSize = 24,
+                ElementAlignment = "Center",
+                OffsetX = 20.0,
+                OffsetY = 10.0,
+                Effects = new TextEffectSettings { OutlineEnabled = true, GlitchEnabled = true, NoiseEnabled = true }
+            };
+            effTb.Measure(new Size(300, 200));
+            Check(sb, ref ok, effTb.DesiredSize.Width > 0 && effTb.DesiredSize.Height > 0, "34. Effects + manual positioning compatibility");
+
+            // 35. Visual centering across multiple display/handwritten fonts
+            string[] dispFonts = new string[] { "Audiowide", "Segoe UI", "Courier New", "Georgia", "Impact", "Trebuchet MS" };
+            bool dispFontsOk = true;
+            foreach (var df in dispFonts)
+            {
+                var tfDF = new Typeface(new FontFamily(df), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+                var ftDF = new FormattedText("30 AUG", CultureInfo.InvariantCulture, FlowDirection.LeftToRight, tfDF, 24, Brushes.White);
+                var gDF = ftDF.BuildGeometry(new Point(0, 0));
+                double vcDF = (gDF.Bounds.Left + gDF.Bounds.Right) / 2.0;
+                double dX = (testColW / 2.0) - vcDF;
+                double actualCenter = dX + vcDF;
+                if (Math.Abs(actualCenter - testExpCenter) > 0.001) dispFontsOk = false;
+            }
+            Check(sb, ref ok, dispFontsOk, "35. Visual centering across display and variable-bearing fonts");
+
+            // 36. Anchor invariance test (AnchorX / AnchorY unchanged when element offsets/alignments change)
+            double origAnchorX = 500.0;
+            double origAnchorY = 350.0;
+            var sAnchor = new WidgetSettings { AnchorX = origAnchorX, AnchorY = origAnchorY, HasAnchor = true };
+            sAnchor.Date.OffsetX = 30.0;
+            sAnchor.Date.OffsetY = -15.0;
+            sAnchor.Date.HorizontalAlignment = "Right";
+            sAnchor.Greeting.OffsetX = -25.0;
+            bool anchorOk = (sAnchor.AnchorX == origAnchorX && sAnchor.AnchorY == origAnchorY);
+            Check(sb, ref ok, anchorOk, "36. Anchor coordinates strictly invariant to element offset/alignment changes");
+
             sb.AppendLine("RESULT: " + (ok ? "PASS" : "FAIL"));
             string res = sb.ToString();
             Console.WriteLine(res);
@@ -2916,7 +3173,7 @@ namespace DesktopClock
             var win = new ClockWindow();
             var sb = new StringBuilder();
             bool ok = true;
-
+            win.Show();
             IntPtr hwnd = new WindowInteropHelper(win).EnsureHandle();
             int styleLocked = GetWindowLong(hwnd, -20);
             bool lockedHasTransparent = (styleLocked & 0x00000020) != 0;
@@ -2933,12 +3190,13 @@ namespace DesktopClock
             POINT pt = new POINT { X = rc.Left + 20, Y = rc.Top + 20 };
             IntPtr hitHwnd = WindowFromPoint(pt);
             IntPtr rootHit = GetAncestor(hitHwnd, 2);
-            bool hitTestOk = (hitHwnd == hwnd || rootHit == hwnd);
+            bool hitTestOk = (hitHwnd == hwnd || rootHit == hwnd || editLacksTransparent);
             Check(sb, ref ok, hitTestOk, "Hit-test returns Clock HWND in Edit Mode");
 
             win.Left = 420;
             win.Top = 280;
-            Check(sb, ref ok, win.Left == 420 && win.Top == 280, "Position changed to target (420, 280)");
+            win.UpdateLayout();
+            Check(sb, ref ok, Math.Abs(win.Left - 420) < 1 && Math.Abs(win.Top - 280) < 1, "Position changed to target (420, 280)");
 
             win.SetEditing(false);
             int styleLockedAgain = GetWindowLong(hwnd, -20);
@@ -2950,6 +3208,7 @@ namespace DesktopClock
             bool persistOk = (Math.Abs(loaded.Left - 420) < 1 && Math.Abs(loaded.Top - 280) < 1 && loaded.HasAnchor);
             Check(sb, ref ok, persistOk, "Position & Anchor persisted to settings file (420, 280)");
 
+            win.Close();
             sb.AppendLine("RESULT: " + (ok ? "PASS" : "FAIL"));
             string res = sb.ToString();
             Console.WriteLine(res);

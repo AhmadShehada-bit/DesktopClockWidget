@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -48,6 +48,11 @@ namespace DesktopClock
         // Core Elements Tab
         private ComboBox _cmbCoreElementSelector;
         private CheckBox _chkCoreElemVisible;
+        private ComboBox _cmbCoreElemAlign;
+        private TextBox _txtCoreElemOffsetX;
+        private Slider _sliderCoreElemOffsetX;
+        private TextBox _txtCoreElemOffsetY;
+        private Slider _sliderCoreElemOffsetY;
         private ComboBox _cmbCoreElemSource;
         private ComboBox _cmbCoreElemCategory;
         private TextBox _txtCoreElemFontSearch;
@@ -139,6 +144,10 @@ namespace DesktopClock
         private Slider _sliderBlockOpacity;
         private TextBlock _lblBlockOpacity;
         private ComboBox _cmbBlockAlignment;
+        private TextBox _txtBlockOffsetX;
+        private Slider _sliderBlockOffsetX;
+        private TextBox _txtBlockOffsetY;
+        private Slider _sliderBlockOffsetY;
         private ComboBox _cmbBlockCase;
         private CheckBox _chkBlockItalic;
         private CheckBox _chkBlockUnderline;
@@ -670,6 +679,94 @@ namespace DesktopClock
             grp.Content = stack;
             root.Children.Add(grp);
 
+            // POSITION & ALIGNMENT SECTION
+            var grpPos = CreateGroupBox("Position & Alignment");
+            var stackPos = new StackPanel { Margin = new Thickness(8) };
+
+            var alignRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
+            alignRow.Children.Add(new TextBlock { Text = "Horizontal:", Width = 110, VerticalAlignment = VerticalAlignment.Center });
+            _cmbCoreElemAlign = CreateComboBox(140);
+            _cmbCoreElemAlign.Items.Add("Left");
+            _cmbCoreElemAlign.Items.Add("Center");
+            _cmbCoreElemAlign.Items.Add("Right");
+            _cmbCoreElemAlign.SelectionChanged += (s, e) =>
+            {
+                if (_isUpdatingUi || _cmbCoreElemAlign.SelectedItem == null) return;
+                var elem = GetSelectedCoreElement();
+                if (elem != null) { elem.HorizontalAlignment = _cmbCoreElemAlign.SelectedItem.ToString(); ApplyPreviewLive(); }
+            };
+            alignRow.Children.Add(_cmbCoreElemAlign);
+            stackPos.Children.Add(alignRow);
+
+            var xRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
+            xRow.Children.Add(new TextBlock { Text = "X Offset (DIP):", Width = 110, VerticalAlignment = VerticalAlignment.Center });
+            _txtCoreElemOffsetX = CreateTextBox(45);
+            _txtCoreElemOffsetX.TextChanged += (s, e) =>
+            {
+                if (_isUpdatingUi) return;
+                double val;
+                if (double.TryParse(_txtCoreElemOffsetX.Text, out val) && val >= -120 && val <= 120)
+                {
+                    var elem = GetSelectedCoreElement();
+                    if (elem != null) { elem.OffsetX = val; _sliderCoreElemOffsetX.Value = val; ApplyPreviewLive(); }
+                }
+            };
+            xRow.Children.Add(_txtCoreElemOffsetX);
+            _sliderCoreElemOffsetX = new Slider { Minimum = -120, Maximum = 120, Value = 0, Width = 160, Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            _sliderCoreElemOffsetX.ValueChanged += (s, e) =>
+            {
+                if (_isUpdatingUi) return;
+                double val = Math.Round(_sliderCoreElemOffsetX.Value);
+                var elem = GetSelectedCoreElement();
+                if (elem != null) { elem.OffsetX = val; _txtCoreElemOffsetX.Text = val.ToString(); ApplyPreviewLive(); }
+            };
+            xRow.Children.Add(_sliderCoreElemOffsetX);
+            stackPos.Children.Add(xRow);
+
+            var yRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
+            yRow.Children.Add(new TextBlock { Text = "Y Offset (DIP):", Width = 110, VerticalAlignment = VerticalAlignment.Center });
+            _txtCoreElemOffsetY = CreateTextBox(45);
+            _txtCoreElemOffsetY.TextChanged += (s, e) =>
+            {
+                if (_isUpdatingUi) return;
+                double val;
+                if (double.TryParse(_txtCoreElemOffsetY.Text, out val) && val >= -80 && val <= 80)
+                {
+                    var elem = GetSelectedCoreElement();
+                    if (elem != null) { elem.OffsetY = val; _sliderCoreElemOffsetY.Value = val; ApplyPreviewLive(); }
+                }
+            };
+            yRow.Children.Add(_txtCoreElemOffsetY);
+            _sliderCoreElemOffsetY = new Slider { Minimum = -80, Maximum = 80, Value = 0, Width = 160, Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            _sliderCoreElemOffsetY.ValueChanged += (s, e) =>
+            {
+                if (_isUpdatingUi) return;
+                double val = Math.Round(_sliderCoreElemOffsetY.Value);
+                var elem = GetSelectedCoreElement();
+                if (elem != null) { elem.OffsetY = val; _txtCoreElemOffsetY.Text = val.ToString(); ApplyPreviewLive(); }
+            };
+            yRow.Children.Add(_sliderCoreElemOffsetY);
+            stackPos.Children.Add(yRow);
+
+            var btnResetPos = CreateStyledButton("Reset Position", 120);
+            btnResetPos.Margin = new Thickness(110, 4, 0, 0);
+            btnResetPos.Click += (s, e) =>
+            {
+                var elem = GetSelectedCoreElement();
+                if (elem != null)
+                {
+                    elem.HorizontalAlignment = "Center";
+                    elem.OffsetX = 0.0;
+                    elem.OffsetY = 0.0;
+                    LoadSelectedCoreElementValues();
+                    ApplyPreviewLive();
+                }
+            };
+            stackPos.Children.Add(btnResetPos);
+
+            grpPos.Content = stackPos;
+            root.Children.Add(grpPos);
+
             // EFFECTS SECTION
             var grpFx = CreateGroupBox("Visual Effects (Outline / Glitch / Noise)");
             var stackFx = new StackPanel { Margin = new Thickness(8) };
@@ -1138,6 +1235,13 @@ namespace DesktopClock
                 _sliderCoreElemOpacity.Value = Math.Round(elem.Opacity * 100.0);
                 _lblCoreElemOpacity.Text = ((int)Math.Round(_sliderCoreElemOpacity.Value)) + "%";
                 _cmbCoreElemCase.SelectedItem = elem.Case ?? "Title";
+
+                // Position & Alignment
+                _cmbCoreElemAlign.SelectedItem = !string.IsNullOrEmpty(elem.HorizontalAlignment) ? elem.HorizontalAlignment : "Center";
+                _txtCoreElemOffsetX.Text = elem.OffsetX.ToString();
+                _sliderCoreElemOffsetX.Value = elem.OffsetX;
+                _txtCoreElemOffsetY.Text = elem.OffsetY.ToString();
+                _sliderCoreElemOffsetY.Value = elem.OffsetY;
 
                 // Effects
                 var fx = elem.Effects;
@@ -1701,6 +1805,72 @@ namespace DesktopClock
             rowAc.Children.Add(_cmbBlockCase);
             appStack.Children.Add(rowAc);
 
+            var rowBx = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
+            rowBx.Children.Add(new TextBlock { Text = "X Offset:", Width = 70, VerticalAlignment = VerticalAlignment.Center });
+            _txtBlockOffsetX = CreateTextBox(40);
+            _txtBlockOffsetX.TextChanged += (s, e) =>
+            {
+                if (_isUpdatingUi) return;
+                double val;
+                if (double.TryParse(_txtBlockOffsetX.Text, out val) && val >= -120 && val <= 120)
+                {
+                    var b = GetSelectedBlock();
+                    if (b != null) { b.OffsetX = val; _sliderBlockOffsetX.Value = val; ApplyPreviewLive(); }
+                }
+            };
+            rowBx.Children.Add(_txtBlockOffsetX);
+            _sliderBlockOffsetX = new Slider { Minimum = -120, Maximum = 120, Value = 0, Width = 110, Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            _sliderBlockOffsetX.ValueChanged += (s, e) =>
+            {
+                if (_isUpdatingUi) return;
+                double val = Math.Round(_sliderBlockOffsetX.Value);
+                var b = GetSelectedBlock();
+                if (b != null) { b.OffsetX = val; _txtBlockOffsetX.Text = val.ToString(); ApplyPreviewLive(); }
+            };
+            rowBx.Children.Add(_sliderBlockOffsetX);
+            appStack.Children.Add(rowBx);
+
+            var rowBy = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
+            rowBy.Children.Add(new TextBlock { Text = "Y Offset:", Width = 70, VerticalAlignment = VerticalAlignment.Center });
+            _txtBlockOffsetY = CreateTextBox(40);
+            _txtBlockOffsetY.TextChanged += (s, e) =>
+            {
+                if (_isUpdatingUi) return;
+                double val;
+                if (double.TryParse(_txtBlockOffsetY.Text, out val) && val >= -80 && val <= 80)
+                {
+                    var b = GetSelectedBlock();
+                    if (b != null) { b.OffsetY = val; _sliderBlockOffsetY.Value = val; ApplyPreviewLive(); }
+                }
+            };
+            rowBy.Children.Add(_txtBlockOffsetY);
+            _sliderBlockOffsetY = new Slider { Minimum = -80, Maximum = 80, Value = 0, Width = 110, Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            _sliderBlockOffsetY.ValueChanged += (s, e) =>
+            {
+                if (_isUpdatingUi) return;
+                double val = Math.Round(_sliderBlockOffsetY.Value);
+                var b = GetSelectedBlock();
+                if (b != null) { b.OffsetY = val; _txtBlockOffsetY.Text = val.ToString(); ApplyPreviewLive(); }
+            };
+            rowBy.Children.Add(_sliderBlockOffsetY);
+
+            var btnResetBPos = CreateStyledButton("Reset Pos", 70);
+            btnResetBPos.Margin = new Thickness(8, 0, 0, 0);
+            btnResetBPos.Click += (s, e) =>
+            {
+                var b = GetSelectedBlock();
+                if (b != null)
+                {
+                    b.Alignment = "Center";
+                    b.OffsetX = 0.0;
+                    b.OffsetY = 0.0;
+                    LoadSelectedBlockValues();
+                    ApplyPreviewLive();
+                }
+            };
+            rowBy.Children.Add(btnResetBPos);
+            appStack.Children.Add(rowBy);
+
             var rowStyle = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
             _chkBlockItalic = new CheckBox { Content = "Italic", FontWeight = FontWeights.Medium, Margin = new Thickness(70, 0, 16, 0) };
             _chkBlockItalic.Click += (s, e) =>
@@ -1928,7 +2098,11 @@ namespace DesktopClock
                 _rectBlockColorSwatch.Fill = new SolidColorBrush(ParseColor(b.Color));
                 _sliderBlockOpacity.Value = Math.Round(b.Opacity * 100.0);
                 _lblBlockOpacity.Text = ((int)Math.Round(_sliderBlockOpacity.Value)) + "%";
-                _cmbBlockAlignment.SelectedItem = b.Alignment ?? "Center";
+                _cmbBlockAlignment.SelectedItem = !string.IsNullOrEmpty(b.Alignment) ? b.Alignment : "Center";
+                _txtBlockOffsetX.Text = b.OffsetX.ToString();
+                _sliderBlockOffsetX.Value = b.OffsetX;
+                _txtBlockOffsetY.Text = b.OffsetY.ToString();
+                _sliderBlockOffsetY.Value = b.OffsetY;
                 _cmbBlockCase.SelectedItem = b.Case ?? "None";
                 _chkBlockItalic.IsChecked = b.Italic;
                 _chkBlockUnderline.IsChecked = b.Underline;
