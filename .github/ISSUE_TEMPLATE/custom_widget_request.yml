@@ -1,0 +1,88 @@
+name: "🧩 Request a Custom Widget"
+description: "Want a custom desktop widget inspired by DesktopClock Widget? Describe what you would like to see."
+title: "[Widget Request]: "
+labels: ["widget-request", "enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### 🧩 Custom Desktop Widget Request
+        DesktopClock Widget is expanding into a family of customizable desktop utilities. Describe your widget concept below!
+  - type: input
+    id: widget_name
+    attributes:
+      label: "Widget Idea / Name"
+      description: "Give your widget concept a clear, catchy name (e.g., Cyber Weather Widget, System Monitor, Daily Quote Hub)."
+      placeholder: "e.g., Cyber Audio Visualizer / Minimalist Task Widget"
+    validations:
+      required: true
+  - type: textarea
+    id: display_content
+    attributes:
+      label: "What should the widget display?"
+      description: "Describe the primary information, indicators, metrics, or dynamic content."
+      placeholder: "e.g., Current CPU/RAM load, mini weather glyph with temperature, daily goals countdown..."
+    validations:
+      required: true
+  - type: dropdown
+    id: desired_style
+    attributes:
+      label: "Desired Aesthetic / Style"
+      options:
+        - "Futuristic / Cyberpunk (Neon cyan/magenta, monospace/tech fonts)"
+        - "Minimalist / Clean (Subtle monochrome, modern sans-serif)"
+        - "Aesthetic / Editorial (Luxury serif, soft tones)"
+        - "Handwritten / Casual (Notebook style, playful fonts)"
+        - "Athletic / Bold (High-impact display typography)"
+        - "Custom / Hybrid"
+    validations:
+      required: true
+  - type: textarea
+    id: inspiration
+    attributes:
+      label: "Example / Inspiration"
+      description: "Reference any existing UI, Rainmeter skin, wallpaper aesthetic, or website design."
+      placeholder: "Links, descriptions, or visual references..."
+    validations:
+      required: false
+  - type: textarea
+    id: customizations
+    attributes:
+      label: "Required Customization Options"
+      description: "What options should users be able to adjust in settings?"
+      placeholder: "e.g., Font selection, color gradients, polling interval, toggleable sub-elements..."
+    validations:
+      required: false
+  - type: input
+    id: preferred_colors
+    attributes:
+      label: "Preferred Color Palette"
+      placeholder: "e.g., Electric Cyan (#00F0FF) and Deep Carbon (#16181A)"
+    validations:
+      required: false
+  - type: dropdown
+    id: animations
+    attributes:
+      label: "Any animations or visual effects?"
+      options:
+        - "Static (No animations, minimal resource usage)"
+        - "Subtle transitions / fading"
+        - "Cyber Glitch / RGB shift"
+        - "Digital Noise / Scanlines"
+        - "Smooth pulsing / glowing"
+    validations:
+      required: true
+  - type: textarea
+    id: additional_notes
+    attributes:
+      label: "Additional Notes / Context"
+      placeholder: "Any other ideas or suggestions..."
+    validations:
+      required: false
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: "Acknowledgement"
+      options:
+        - label: "I understand this is a feature/customization request and not a guaranteed development commitment."
+          required: true

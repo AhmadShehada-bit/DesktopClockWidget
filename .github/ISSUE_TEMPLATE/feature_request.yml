@@ -1,0 +1,57 @@
+name: "✨ Request a Feature"
+description: "Suggest a new idea or enhancement for DesktopClock Widget."
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### ✨ Feature Request
+        Thank you for helping make DesktopClock Widget better!
+  - type: input
+    id: feature_name
+    attributes:
+      label: "Feature Name"
+      placeholder: "Short, descriptive title of your idea"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: "Area / Component"
+      options:
+        - "Clock (Time / Date / Weekday / Greeting)"
+        - "Fonts (Catalog, Wheel Browsing, Resolution)"
+        - "Effects (Outline, Glitch, Noise)"
+        - "Positioning (Offset, Alignment, Anchor)"
+        - "Custom Blocks (Rotating Text, Schedules, Symbols)"
+        - "Settings Window UI"
+        - "Performance & Memory"
+        - "System Tray & Startup"
+        - "Other"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: "Problem / Use Case"
+      description: "What problem does this feature solve or what workflow does it enhance?"
+      placeholder: "Currently, when I want to..."
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: "Suggested Solution"
+      description: "How would you like this feature to work?"
+      placeholder: "It would be great if..."
+    validations:
+      required: true
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: "Additional Context / Mockups"
+      description: "Add any screenshots, mockups, or examples."
+      placeholder: "Paste links or notes here..."
+    validations:
+      required: false
