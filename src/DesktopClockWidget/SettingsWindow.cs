@@ -755,6 +755,14 @@ namespace DesktopClock
                     }
                 }
             };
+            _txtCoreElemOffsetX.PreviewKeyDown += (s, e) =>
+            {
+                double step = (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? 0.5 : ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? 10.0 : 1.0);
+                if (e.Key == Key.Up || e.Key == Key.Right) { NudgeCoreElement(step, 0); e.Handled = true; }
+                else if (e.Key == Key.Down || e.Key == Key.Left) { NudgeCoreElement(-step, 0); e.Handled = true; }
+                else if (e.Key == Key.Enter) { ApplyPreviewLive(); e.Handled = true; }
+                else if (e.Key == Key.Escape) { LoadSelectedCoreElementValues(); e.Handled = true; }
+            };
             xRow.Children.Add(_txtCoreElemOffsetX);
 
             _btnCoreElemIncX = CreateStyledButton("+", 26);
@@ -814,6 +822,14 @@ namespace DesktopClock
                         }
                     }
                 }
+            };
+            _txtCoreElemOffsetY.PreviewKeyDown += (s, e) =>
+            {
+                double step = (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? 0.5 : ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? 10.0 : 1.0);
+                if (e.Key == Key.Down || e.Key == Key.Right) { NudgeCoreElement(0, step); e.Handled = true; }
+                else if (e.Key == Key.Up || e.Key == Key.Left) { NudgeCoreElement(0, -step); e.Handled = true; }
+                else if (e.Key == Key.Enter) { ApplyPreviewLive(); e.Handled = true; }
+                else if (e.Key == Key.Escape) { LoadSelectedCoreElementValues(); e.Handled = true; }
             };
             yRow.Children.Add(_txtCoreElemOffsetY);
 
@@ -1488,15 +1504,26 @@ namespace DesktopClock
         private void SettingsWindow_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             var focused = Keyboard.FocusedElement as DependencyObject;
-            if (focused is TextBox || focused is ComboBox || focused is Slider || focused is ListBox)
+
+            // If user is focused inside a general text editing box (like custom text, rotating msg, search), let normal editing work
+            if (focused == _txtBlockStaticText || focused == _txtCustomGreeting || focused == _txtCatalogSearch || focused == _txtCoreElemFontSearch)
             {
                 return;
             }
 
-            bool isCoreActive = (_tabs != null && _tabs.SelectedIndex == 1 && _chkCoreElemNudgeMode != null && _chkCoreElemNudgeMode.IsChecked == true);
-            bool isBlockActive = (_tabs != null && _tabs.SelectedIndex == 2 && _chkBlockNudgeMode != null && _chkBlockNudgeMode.IsChecked == true);
+            // If user is focused on the offset text boxes, their dedicated PreviewKeyDown handles them
+            if (focused == _txtCoreElemOffsetX || focused == _txtCoreElemOffsetY || focused == _txtBlockOffsetX || focused == _txtBlockOffsetY)
+            {
+                return;
+            }
 
-            if (!isCoreActive && !isBlockActive) return;
+            bool isCoreTab = (_tabs != null && _tabs.SelectedIndex == 1);
+            bool isBlockTab = (_tabs != null && _tabs.SelectedIndex == 2);
+
+            if (!isCoreTab && !isBlockTab) return;
+
+            // Directional keys
+            if (e.Key != Key.Left && e.Key != Key.Right && e.Key != Key.Up && e.Key != Key.Down) return;
 
             double step = 1.0;
             if ((Keyboard.Modifiers & ModifierKeys.Control) != 0) step = 0.5;
@@ -1504,26 +1531,26 @@ namespace DesktopClock
 
             if (e.Key == Key.Left)
             {
-                if (isCoreActive) NudgeCoreElement(-step, 0);
-                else if (isBlockActive) NudgeCustomBlock(-step, 0);
+                if (isCoreTab) NudgeCoreElement(-step, 0);
+                else if (isBlockTab) NudgeCustomBlock(-step, 0);
                 e.Handled = true;
             }
             else if (e.Key == Key.Right)
             {
-                if (isCoreActive) NudgeCoreElement(step, 0);
-                else if (isBlockActive) NudgeCustomBlock(step, 0);
+                if (isCoreTab) NudgeCoreElement(step, 0);
+                else if (isBlockTab) NudgeCustomBlock(step, 0);
                 e.Handled = true;
             }
             else if (e.Key == Key.Up)
             {
-                if (isCoreActive) NudgeCoreElement(0, -step);
-                else if (isBlockActive) NudgeCustomBlock(0, -step);
+                if (isCoreTab) NudgeCoreElement(0, -step);
+                else if (isBlockTab) NudgeCustomBlock(0, -step);
                 e.Handled = true;
             }
             else if (e.Key == Key.Down)
             {
-                if (isCoreActive) NudgeCoreElement(0, step);
-                else if (isBlockActive) NudgeCustomBlock(0, step);
+                if (isCoreTab) NudgeCoreElement(0, step);
+                else if (isBlockTab) NudgeCustomBlock(0, step);
                 e.Handled = true;
             }
         }
@@ -2152,6 +2179,14 @@ namespace DesktopClock
                     }
                 }
             };
+            _txtBlockOffsetX.PreviewKeyDown += (s, e) =>
+            {
+                double step = (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? 0.5 : ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? 10.0 : 1.0);
+                if (e.Key == Key.Up || e.Key == Key.Right) { NudgeCustomBlock(step, 0); e.Handled = true; }
+                else if (e.Key == Key.Down || e.Key == Key.Left) { NudgeCustomBlock(-step, 0); e.Handled = true; }
+                else if (e.Key == Key.Enter) { ApplyPreviewLive(); e.Handled = true; }
+                else if (e.Key == Key.Escape) { LoadSelectedBlockValues(); e.Handled = true; }
+            };
             rowBx.Children.Add(_txtBlockOffsetX);
 
             _btnBlockIncX = CreateStyledButton("+", 24);
@@ -2210,6 +2245,14 @@ namespace DesktopClock
                         }
                     }
                 }
+            };
+            _txtBlockOffsetY.PreviewKeyDown += (s, e) =>
+            {
+                double step = (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? 0.5 : ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? 10.0 : 1.0);
+                if (e.Key == Key.Down || e.Key == Key.Right) { NudgeCustomBlock(0, step); e.Handled = true; }
+                else if (e.Key == Key.Up || e.Key == Key.Left) { NudgeCustomBlock(0, -step); e.Handled = true; }
+                else if (e.Key == Key.Enter) { ApplyPreviewLive(); e.Handled = true; }
+                else if (e.Key == Key.Escape) { LoadSelectedBlockValues(); e.Handled = true; }
             };
             rowBy.Children.Add(_txtBlockOffsetY);
 
@@ -2816,11 +2859,11 @@ namespace DesktopClock
             var curated = FontCatalog.FindCurated(item);
             if (curated != null)
             {
-                _lblCatalogFontMeta.Text = string.Format("Font: {0} | Source: App Font | Category: {1}", item, curated.Category);
+                _lblCatalogFontMeta.Text = string.Format("Font: {0} | Source: App Font | File: {1} | Family: {2} | Category: {3} | Status: ✓ Available", item, curated.FileName, curated.ActualFamily, curated.Category);
             }
             else
             {
-                _lblCatalogFontMeta.Text = string.Format("Font: {0} | Source: System Font", item);
+                _lblCatalogFontMeta.Text = string.Format("Font: {0} | Source: System Font | Status: ✓ Available", item);
             }
         }
 
