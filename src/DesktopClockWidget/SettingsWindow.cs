@@ -23,6 +23,8 @@ using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 using Key = System.Windows.Input.Key;
 using Keyboard = System.Windows.Input.Keyboard;
 using ModifierKeys = System.Windows.Input.ModifierKeys;
+using DispatcherTimer = System.Windows.Threading.DispatcherTimer;
+using DispatcherPriority = System.Windows.Threading.DispatcherPriority;
 
 namespace DesktopClock
 {
@@ -282,6 +284,7 @@ namespace DesktopClock
             {
                 _applied = true;
                 _host.CommitSettings(_preview);
+                Fonts.ClearPreviewCache();
             };
 
             var btnOk = CreateStyledButton("OK", 80);
@@ -289,6 +292,7 @@ namespace DesktopClock
             {
                 _applied = true;
                 _host.CommitSettings(_preview);
+                Fonts.ClearPreviewCache();
                 Close();
             };
 
@@ -296,6 +300,7 @@ namespace DesktopClock
             btnCancel.Click += (s, e) =>
             {
                 if (!_applied) _host.ApplyPreview(_original);
+                Fonts.ClearPreviewCache();
                 Close();
             };
 
@@ -312,6 +317,7 @@ namespace DesktopClock
             {
                 _host.SetElementEditingHighlight(null);
                 if (!_applied) _host.ApplyPreview(_original);
+                Fonts.ClearPreviewCache();
             };
         }
 
@@ -560,7 +566,61 @@ namespace DesktopClock
                     UpdateCoreFontFavButton();
                     UpdateCoreFontPreview();
                     UpdateCoreFontMetadata();
-                    ApplyPreviewLive();
+                    SchedulePreviewLive();
+                }
+            };
+
+            fontRow.PreviewMouseWheel += (s, e) =>
+            {
+                if (_cmbCoreElemFont.Items.Count == 0) return;
+                int step = (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? 5 : ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? 10 : 1);
+                int delta = e.Delta < 0 ? step : -step;
+                int cur = _cmbCoreElemFont.SelectedIndex >= 0 ? _cmbCoreElemFont.SelectedIndex : 0;
+                int count = _cmbCoreElemFont.Items.Count;
+                int next = (cur + delta) % count;
+                if (next < 0) next += count;
+                _cmbCoreElemFont.SelectedIndex = next;
+                e.Handled = true;
+            };
+
+            _cmbCoreElemFont.PreviewKeyDown += (s, e) =>
+            {
+                if (_cmbCoreElemFont.Items.Count == 0) return;
+                int count = _cmbCoreElemFont.Items.Count;
+                int cur = _cmbCoreElemFont.SelectedIndex >= 0 ? _cmbCoreElemFont.SelectedIndex : 0;
+                if (e.Key == Key.Up)
+                {
+                    int next = (cur - 1 + count) % count;
+                    _cmbCoreElemFont.SelectedIndex = next;
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.Down)
+                {
+                    int next = (cur + 1) % count;
+                    _cmbCoreElemFont.SelectedIndex = next;
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.PageUp)
+                {
+                    int next = (cur - 10 + count) % count;
+                    _cmbCoreElemFont.SelectedIndex = next;
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.PageDown)
+                {
+                    int next = (cur + 10) % count;
+                    _cmbCoreElemFont.SelectedIndex = next;
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.Home)
+                {
+                    _cmbCoreElemFont.SelectedIndex = 0;
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.End)
+                {
+                    _cmbCoreElemFont.SelectedIndex = count - 1;
+                    e.Handled = true;
                 }
             };
             fontRow.Children.Add(_cmbCoreElemFont);
@@ -1395,14 +1455,16 @@ namespace DesktopClock
             var elem = GetSelectedCoreElement();
             if (elem == null || string.IsNullOrEmpty(elem.FontFamily)) return;
 
+            int cur = _cmbCoreElemFont != null ? _cmbCoreElemFont.SelectedIndex + 1 : 1;
+            int total = _cmbCoreElemFont != null ? _cmbCoreElemFont.Items.Count : 1;
             var curated = FontCatalog.FindCurated(elem.FontFamily);
             if (curated != null)
             {
-                _lblCoreElemFontMeta.Text = string.Format("Source: App Font | Category: {0}", curated.Category);
+                _lblCoreElemFontMeta.Text = string.Format("{0} | {1} | {2} / {3}", elem.FontFamily, curated.Category, cur, total);
             }
             else
             {
-                _lblCoreElemFontMeta.Text = "Source: System Font";
+                _lblCoreElemFontMeta.Text = string.Format("{0} | System | {1} / {2}", elem.FontFamily, cur, total);
             }
         }
 
@@ -2769,7 +2831,77 @@ namespace DesktopClock
                 BorderBrush = new SolidColorBrush(Color.FromRgb(50, 52, 58)),
                 Margin = new Thickness(0, 0, 0, 8)
             };
-            _lstCatalogFonts.SelectionChanged += (s, e) => UpdateCatalogSample();
+            VirtualizingStackPanel.SetIsVirtualizing(_lstCatalogFonts, true);
+            VirtualizingStackPanel.SetVirtualizationMode(_lstCatalogFonts, VirtualizationMode.Recycling);
+            ScrollViewer.SetIsDeferredScrollingEnabled(_lstCatalogFonts, false);
+
+            _lstCatalogFonts.SelectionChanged += (s, e) =>
+            {
+                UpdateCatalogSample();
+                ApplyCatalogFontToCurrentElement();
+            };
+
+            _lstCatalogFonts.PreviewMouseWheel += (s, e) =>
+            {
+                if (_lstCatalogFonts.Items.Count == 0) return;
+                int step = (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? 5 : ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? 10 : 1);
+                int delta = e.Delta < 0 ? step : -step;
+                int cur = _lstCatalogFonts.SelectedIndex >= 0 ? _lstCatalogFonts.SelectedIndex : 0;
+                int count = _lstCatalogFonts.Items.Count;
+                int next = (cur + delta) % count;
+                if (next < 0) next += count;
+                _lstCatalogFonts.SelectedIndex = next;
+                _lstCatalogFonts.ScrollIntoView(_lstCatalogFonts.SelectedItem);
+                e.Handled = true;
+            };
+
+            _lstCatalogFonts.PreviewKeyDown += (s, e) =>
+            {
+                if (_lstCatalogFonts.Items.Count == 0) return;
+                int count = _lstCatalogFonts.Items.Count;
+                int cur = _lstCatalogFonts.SelectedIndex >= 0 ? _lstCatalogFonts.SelectedIndex : 0;
+                if (e.Key == Key.Up)
+                {
+                    int next = (cur - 1 + count) % count;
+                    _lstCatalogFonts.SelectedIndex = next;
+                    _lstCatalogFonts.ScrollIntoView(_lstCatalogFonts.SelectedItem);
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.Down)
+                {
+                    int next = (cur + 1) % count;
+                    _lstCatalogFonts.SelectedIndex = next;
+                    _lstCatalogFonts.ScrollIntoView(_lstCatalogFonts.SelectedItem);
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.PageUp)
+                {
+                    int next = (cur - 10 + count) % count;
+                    _lstCatalogFonts.SelectedIndex = next;
+                    _lstCatalogFonts.ScrollIntoView(_lstCatalogFonts.SelectedItem);
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.PageDown)
+                {
+                    int next = (cur + 10) % count;
+                    _lstCatalogFonts.SelectedIndex = next;
+                    _lstCatalogFonts.ScrollIntoView(_lstCatalogFonts.SelectedItem);
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.Home)
+                {
+                    _lstCatalogFonts.SelectedIndex = 0;
+                    _lstCatalogFonts.ScrollIntoView(_lstCatalogFonts.SelectedItem);
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.End)
+                {
+                    _lstCatalogFonts.SelectedIndex = count - 1;
+                    _lstCatalogFonts.ScrollIntoView(_lstCatalogFonts.SelectedItem);
+                    e.Handled = true;
+                }
+            };
+
             Grid.SetRow(_lstCatalogFonts, 1);
             root.Children.Add(_lstCatalogFonts);
 
@@ -2781,6 +2913,19 @@ namespace DesktopClock
                 Padding = new Thickness(8),
                 Background = new SolidColorBrush(Color.FromRgb(22, 24, 26)),
                 Margin = new Thickness(0, 0, 0, 6)
+            };
+            sampleBorder.PreviewMouseWheel += (s, e) =>
+            {
+                if (_lstCatalogFonts == null || _lstCatalogFonts.Items.Count == 0) return;
+                int step = (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? 5 : ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? 10 : 1);
+                int delta = e.Delta < 0 ? step : -step;
+                int cur = _lstCatalogFonts.SelectedIndex >= 0 ? _lstCatalogFonts.SelectedIndex : 0;
+                int count = _lstCatalogFonts.Items.Count;
+                int next = (cur + delta) % count;
+                if (next < 0) next += count;
+                _lstCatalogFonts.SelectedIndex = next;
+                _lstCatalogFonts.ScrollIntoView(_lstCatalogFonts.SelectedItem);
+                e.Handled = true;
             };
 
             var sampleStack = new StackPanel();
@@ -2850,20 +2995,60 @@ namespace DesktopClock
         {
             if (_lstCatalogFonts.SelectedItem == null) return;
             string item = _lstCatalogFonts.SelectedItem.ToString().Trim();
-            if (item.StartsWith("\u2605 ")) item = item.Substring(2).Trim();
+            if (item.StartsWith("★ ")) item = item.Substring(2).Trim();
             int tagIdx = item.IndexOf(" [");
             if (tagIdx > 0) item = item.Substring(0, tagIdx).Trim();
 
             _lblCatalogSample.FontFamily = Fonts.For(item);
 
             var curated = FontCatalog.FindCurated(item);
+            int curIdx = _lstCatalogFonts.SelectedIndex + 1;
+            int total = _lstCatalogFonts.Items.Count;
             if (curated != null)
             {
-                _lblCatalogFontMeta.Text = string.Format("Font: {0} | Source: App Font | File: {1} | Family: {2} | Category: {3} | Status: ✓ Available", item, curated.FileName, curated.ActualFamily, curated.Category);
+                _lblCatalogFontMeta.Text = string.Format("Font: {0} | Category: {1} | {2} / {3} | File: {4}", item, curated.Category, curIdx, total, curated.FileName);
+                if (curated.Category == "Handwritten")
+                {
+                    _lblCatalogSample.Text = "Sunday 01:23 PM\nThe quick brown fox jumps over the lazy dog";
+                }
+                else if (curated.Category == "Aesthetic")
+                {
+                    _lblCatalogSample.Text = "GOOD AFTERNOON\nSunday 01:23 PM\nAesthetic Design Studio";
+                }
+                else
+                {
+                    _lblCatalogSample.Text = "GOOD AFTERNOON\nSunday 01:23 PM";
+                }
             }
             else
             {
-                _lblCatalogFontMeta.Text = string.Format("Font: {0} | Source: System Font | Status: ✓ Available", item);
+                _lblCatalogFontMeta.Text = string.Format("Font: {0} | Source: System Font | {1} / {2}", item, curIdx, total);
+                _lblCatalogSample.Text = "GOOD AFTERNOON\nSunday 01:23 PM";
+            }
+        }
+
+        private void ApplyCatalogFontToCurrentElement()
+        {
+            if (_lstCatalogFonts.SelectedItem == null) return;
+            string item = _lstCatalogFonts.SelectedItem.ToString().Trim();
+            if (item.StartsWith("★ ")) item = item.Substring(2).Trim();
+            int tagIdx = item.IndexOf(" [");
+            if (tagIdx > 0) item = item.Substring(0, tagIdx).Trim();
+
+            var elem = GetSelectedCoreElement();
+            if (elem != null)
+            {
+                elem.FontFamily = item;
+                if (_cmbCoreElemFont != null && _cmbCoreElemFont.Items.Contains(item))
+                {
+                    _isUpdatingUi = true;
+                    try { _cmbCoreElemFont.SelectedItem = item; }
+                    finally { _isUpdatingUi = false; }
+                }
+                UpdateCoreFontFavButton();
+                UpdateCoreFontPreview();
+                UpdateCoreFontMetadata();
+                SchedulePreviewLive();
             }
         }
 
@@ -2976,6 +3161,24 @@ namespace DesktopClock
             {
                 _isUpdatingUi = false;
             }
+        }
+
+        private DispatcherTimer _previewCoalesceTimer;
+
+        private void SchedulePreviewLive()
+        {
+            if (_previewCoalesceTimer == null)
+            {
+                _previewCoalesceTimer = new DispatcherTimer(DispatcherPriority.Render);
+                _previewCoalesceTimer.Interval = TimeSpan.FromMilliseconds(15);
+                _previewCoalesceTimer.Tick += (s, e) =>
+                {
+                    _previewCoalesceTimer.Stop();
+                    ApplyPreviewLive();
+                };
+            }
+            _previewCoalesceTimer.Stop();
+            _previewCoalesceTimer.Start();
         }
 
         private void ApplyPreviewLive()

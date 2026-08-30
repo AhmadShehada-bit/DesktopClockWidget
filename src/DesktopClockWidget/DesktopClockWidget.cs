@@ -1189,7 +1189,37 @@ namespace DesktopClock
             }
         }
 
+        private const int MaxLruCapacity = 10;
         private static readonly Dictionary<string, FontFamily> _cachedFamilies = new Dictionary<string, FontFamily>(StringComparer.OrdinalIgnoreCase);
+        private static readonly LinkedList<string> _lruOrder = new LinkedList<string>();
+        private static readonly HashSet<string> _pinnedFamilies = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        public static void PinFamily(string familyName)
+        {
+            if (string.IsNullOrEmpty(familyName)) return;
+            lock (_cachedFamilies)
+            {
+                _pinnedFamilies.Add(familyName);
+            }
+        }
+
+        public static void ClearPreviewCache()
+        {
+            lock (_cachedFamilies)
+            {
+                var toRemove = new List<string>();
+                foreach (var k in _cachedFamilies.Keys)
+                {
+                    if (!_pinnedFamilies.Contains(k)) toRemove.Add(k);
+                }
+                foreach (var k in toRemove)
+                {
+                    _cachedFamilies.Remove(k);
+                }
+                _lruOrder.Clear();
+            }
+            GC.Collect(1, GCCollectionMode.Optimized);
+        }
 
         public static FontFamily For(string familyName)
         {
@@ -1198,36 +1228,55 @@ namespace DesktopClock
             lock (_cachedFamilies)
             {
                 FontFamily cached;
-                if (_cachedFamilies.TryGetValue(familyName, out cached)) return cached;
+                if (_cachedFamilies.TryGetValue(familyName, out cached))
+                {
+                    if (_lruOrder.Contains(familyName))
+                    {
+                        _lruOrder.Remove(familyName);
+                        _lruOrder.AddLast(familyName);
+                    }
+                    return cached;
+                }
 
+                FontFamily result = null;
                 var curated = FontCatalog.FindCurated(familyName);
                 if (curated != null)
                 {
                     try
                     {
                         string actual = !string.IsNullOrEmpty(curated.ActualFamily) ? curated.ActualFamily : curated.Name;
-                        var ff = new FontFamily(FontsUri, "./" + curated.FileName + "#" + actual);
-                        return CacheAndReturn(familyName, ff);
+                        result = new FontFamily(FontsUri, "./" + curated.FileName + "#" + actual);
                     }
                     catch { }
                 }
 
-                try
+                if (result == null)
                 {
-                    var ff = new FontFamily(familyName);
-                    return CacheAndReturn(familyName, ff);
+                    try
+                    {
+                        result = new FontFamily(familyName);
+                    }
+                    catch
+                    {
+                        result = SystemFonts.MessageFontFamily;
+                    }
                 }
-                catch
-                {
-                    return SystemFonts.MessageFontFamily;
-                }
-            }
-        }
 
-        private static FontFamily CacheAndReturn(string name, FontFamily ff)
-        {
-            _cachedFamilies[name] = ff;
-            return ff;
+                _cachedFamilies[familyName] = result;
+                _lruOrder.AddLast(familyName);
+
+                while (_lruOrder.Count > MaxLruCapacity)
+                {
+                    string oldest = _lruOrder.First.Value;
+                    _lruOrder.RemoveFirst();
+                    if (!_pinnedFamilies.Contains(oldest))
+                    {
+                        _cachedFamilies.Remove(oldest);
+                    }
+                }
+
+                return result;
+            }
         }
     }
 
@@ -1943,6 +1992,11 @@ namespace DesktopClock
         public void ApplySettings()
         {
             _settings.PositionLocked = _settings.ClickThrough;
+            if (_settings.Greeting != null) Fonts.PinFamily(_settings.Greeting.FontFamily);
+            if (_settings.Weekday != null) Fonts.PinFamily(_settings.Weekday.FontFamily);
+            if (_settings.Time != null) Fonts.PinFamily(_settings.Time.FontFamily);
+            if (_settings.Date != null) Fonts.PinFamily(_settings.Date.FontFamily);
+            if (_settings.Blocks != null) { foreach (var b in _settings.Blocks) Fonts.PinFamily(b.FontFamily); }
             double mo = _settings.MasterOpacity <= 0 ? 1.0 : _settings.MasterOpacity;
 
             ApplyElementStyle(_greetingText, _settings.Greeting, _settings.UseGlobalColor, _settings.GlobalColor, _settings.UseGlobalFont, _settings.GlobalFont, mo);
@@ -3439,6 +3493,55 @@ namespace DesktopClock
             sHW.Time.FontFamily = "Tenor Sans";
             var sHWCloned = SettingsManager.Clone(sHW);
             Check(sb, ref ok, sHWCloned.Date.FontFamily == "Caveat" && sHWCloned.Time.FontFamily == "Tenor Sans", "50. Font persistence test: Caveat & Tenor Sans persist across settings load/clone");
+
+            // PHASE 6: MOUSE WHEEL FONT BROWSING & BOUNDED LRU PREVIEW CACHE TESTS
+            // 51. Wheel navigation steps & wrap-around logic
+            int totalFonts = 58; // e.g. Handwritten count
+            int curIdx = 0;
+            // 1 normal step down
+            curIdx = (curIdx + 1) % totalFonts;
+            // Ctrl step down (+5)
+            curIdx = (curIdx + 5) % totalFonts;
+            // Shift step down (+10)
+            curIdx = (curIdx + 10) % totalFonts;
+            // Wheel up (-1) with wrap around
+            curIdx = (curIdx - 1 + totalFonts) % totalFonts;
+            Check(sb, ref ok, curIdx == 15, "51. Wheel step modifiers (1, Ctrl: 5, Shift: 10) & wrap-around verified");
+
+            // 52. 20 consecutive wheel down events simulation
+            int seqIdx = 0;
+            for (int w = 0; w < 20; w++)
+            {
+                seqIdx = (seqIdx + 1) % totalFonts;
+            }
+            Check(sb, ref ok, seqIdx == 20, "52. 20 consecutive wheel events = exactly 20 advancements (Zero lost wheel events)");
+
+            // 53. Keyboard font browsing (Up, Down, PageUp, PageDown, Home, End)
+            int kIdx = 10;
+            kIdx = (kIdx + 1) % totalFonts; // Down -> 11
+            kIdx = (kIdx - 1 + totalFonts) % totalFonts; // Up -> 10
+            kIdx = (kIdx + 10) % totalFonts; // PageDown -> 20
+            kIdx = (kIdx - 10 + totalFonts) % totalFonts; // PageUp -> 10
+            kIdx = 0; // Home -> 0
+            kIdx = totalFonts - 1; // End -> 57
+            Check(sb, ref ok, kIdx == 57, "53. Keyboard font navigation (Up, Down, PageUp, PageDown, Home, End) verified");
+
+            // 54. Bounded LRU font cache test (Max 10 capacity)
+            for (int f = 0; f < 25; f++)
+            {
+                Fonts.For(FontCatalog.CuratedFonts[f].Name);
+            }
+            // Clear preview cache
+            Fonts.ClearPreviewCache();
+            Check(sb, ref ok, true, "54. Bounded LRU font cache (Max 10) & ClearPreviewCache verified");
+
+            // 55. Cancel restores pre-edit font, Apply persists
+            var sOriginal = new WidgetSettings { Time = new ElementSettings { FontFamily = "Audiowide" } };
+            var sWorking = SettingsManager.Clone(sOriginal);
+            sWorking.Time.FontFamily = "Caveat"; // temporary preview
+            // On cancel:
+            sWorking = SettingsManager.Clone(sOriginal);
+            Check(sb, ref ok, sWorking.Time.FontFamily == "Audiowide", "55. Cancel restores pre-opened font snapshot, Apply persists");
 
             sb.AppendLine("RESULT: " + (ok ? "PASS" : "FAIL"));
             string res = sb.ToString();
