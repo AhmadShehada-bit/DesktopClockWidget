@@ -2790,11 +2790,13 @@ namespace DesktopClock
             _openSettingsWindow = new SettingsWindow(this, _settings);
             _openSettingsWindow.Closed += (s, e) =>
             {
+                var win = _openSettingsWindow;
                 _openSettingsWindow = null;
-                Dispatcher.BeginInvoke(new Action(() =>
+                if (win != null)
                 {
-                    GC.Collect(2, GCCollectionMode.Optimized);
-                }), DispatcherPriority.ApplicationIdle, null);
+                    win.Teardown();
+                }
+                Fonts.ClearPreviewCache();
             };
             _openSettingsWindow.Show();
         }

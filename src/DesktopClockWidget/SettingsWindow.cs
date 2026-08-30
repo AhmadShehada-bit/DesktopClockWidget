@@ -30,9 +30,9 @@ namespace DesktopClock
 {
     public class SettingsWindow : Window
     {
-        private readonly ISettingsHost _host;
+        private ISettingsHost _host;
         private WidgetSettings _preview;
-        private readonly WidgetSettings _original;
+        private WidgetSettings _original;
         private bool _applied = false;
         private bool _isUpdatingUi = false;
 
@@ -319,6 +319,67 @@ namespace DesktopClock
                 if (!_applied) _host.ApplyPreview(_original);
                 Fonts.ClearPreviewCache();
             };
+        }
+
+        public void Teardown()
+        {
+            if (_previewCoalesceTimer != null)
+            {
+                _previewCoalesceTimer.Stop();
+                _previewCoalesceTimer = null;
+            }
+
+            PreviewKeyDown -= SettingsWindow_PreviewKeyDown;
+
+            if (_lstCatalogFonts != null)
+            {
+                _lstCatalogFonts.Items.Clear();
+            }
+            if (_cmbCoreElemFont != null)
+            {
+                _cmbCoreElemFont.Items.Clear();
+            }
+            if (_cmbCoreElemCategory != null)
+            {
+                _cmbCoreElemCategory.Items.Clear();
+            }
+            if (_cmbCoreElemSource != null)
+            {
+                _cmbCoreElemSource.Items.Clear();
+            }
+            if (_cmbCatalogCategory != null)
+            {
+                _cmbCatalogCategory.Items.Clear();
+            }
+            if (_cmbCatalogSource != null)
+            {
+                _cmbCatalogSource.Items.Clear();
+            }
+            if (_lstBlocks != null)
+            {
+                _lstBlocks.Items.Clear();
+            }
+            if (_lstBlockMessages != null)
+            {
+                _lstBlockMessages.Items.Clear();
+            }
+            if (_lstBlockSchedules != null)
+            {
+                _lstBlockSchedules.Items.Clear();
+            }
+            if (_cmbBlockFont != null)
+            {
+                _cmbBlockFont.Items.Clear();
+            }
+
+            if (_lblCatalogSample != null) _lblCatalogSample.ClearValue(TextBlock.FontFamilyProperty);
+            if (_lblCoreElemFontPreview != null) _lblCoreElemFontPreview.ClearValue(TextBlock.FontFamilyProperty);
+            if (_lblBlockFontPreview != null) _lblBlockFontPreview.ClearValue(TextBlock.FontFamilyProperty);
+
+            Content = null;
+            _host = null;
+            _preview = null;
+            _original = null;
         }
 
         private UIElement CreateGeneralTab()
