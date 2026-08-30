@@ -1,4 +1,7 @@
-# DesktopClock Widget
+﻿<div align="center">
+  <img src="assets/logo-256.png" width="128" height="128" alt="DesktopClock Widget Logo" />
+  <h1>DesktopClock Widget</h1>
+</div>
 
 A lightweight, customizable Windows desktop clock widget with advanced typography, custom blocks, dynamic scheduled messages, and visual text effects.
 
@@ -46,7 +49,7 @@ A lightweight, customizable Windows desktop clock widget with advanced typograph
 ## Installation & Usage
 
 ### Portable Installation
-1. Download `DesktopClockWidget-v1.0.0-portable.zip` from the [Releases](https://github.com/AhmadShehada-bit/DesktopClockWidget/releases) page.
+1. Download `DesktopClockWidget-v1.0.1-portable.zip` from the [Releases](https://github.com/AhmadShehada-bit/DesktopClockWidget/releases) page.
 2. Extract the archive to any folder (e.g. `C:\Tools\DesktopClock` or `%LOCALAPPDATA%\DesktopClock`).
 3. Run `DesktopClockWidget.exe`.
 

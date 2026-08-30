@@ -2363,19 +2363,64 @@ namespace DesktopClock
         {
             try
             {
-                using (var bmp = new System.Drawing.Bitmap(16, 16))
+                string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                string icoPath = System.IO.Path.Combine(baseDir, "app.ico");
+                if (System.IO.File.Exists(icoPath))
+                {
+                    return new System.Drawing.Icon(icoPath, 32, 32);
+                }
+
+                // High-precision programmatic rendering of official cyber clock logo
+                using (var bmp = new System.Drawing.Bitmap(32, 32))
                 {
                     using (var g = System.Drawing.Graphics.FromImage(bmp))
                     {
-                        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+                        g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                        g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
                         g.Clear(System.Drawing.Color.Transparent);
-                        using (var pen = new System.Drawing.Pen(System.Drawing.Color.White, 2f)) g.DrawEllipse(pen, 1f, 1f, 13f, 13f);
-                        using (var pen = new System.Drawing.Pen(System.Drawing.Color.White, 2f))
+
+                        float center = 16f;
+                        float r = 13.5f;
+
+                        // Cyan and White outer segmented arcs
+                        using (var penCyan = new System.Drawing.Pen(System.Drawing.Color.FromArgb(255, 0, 240, 255), 2.6f) { StartCap = System.Drawing.Drawing2D.LineCap.Round, EndCap = System.Drawing.Drawing2D.LineCap.Round })
+                        using (var penWhite = new System.Drawing.Pen(System.Drawing.Color.FromArgb(240, 245, 255), 2.2f) { StartCap = System.Drawing.Drawing2D.LineCap.Round, EndCap = System.Drawing.Drawing2D.LineCap.Round })
                         {
-                            g.DrawLine(pen, 8f, 8f, 8f, 4f);
-                            g.DrawLine(pen, 8f, 8f, 11f, 9f);
+                            var rect = new System.Drawing.RectangleF(center - r, center - r, r * 2f, r * 2f);
+                            g.DrawArc(penCyan, rect, 220f, 100f);
+                            g.DrawArc(penWhite, rect, 335f, 70f);
+                            g.DrawArc(penCyan, rect, 40f, 100f);
+                            g.DrawArc(penWhite, rect, 155f, 50f);
+                        }
+
+                        // Cardinal Ticks
+                        using (var penTickCyan = new System.Drawing.Pen(System.Drawing.Color.FromArgb(255, 0, 240, 255), 2.0f))
+                        using (var penTickWhite = new System.Drawing.Pen(System.Drawing.Color.FromArgb(255, 255, 255), 2.0f))
+                        {
+                            g.DrawLine(penTickCyan, center, center - r - 2f, center, center - r + 2f);
+                            g.DrawLine(penTickCyan, center, center + r - 2f, center, center + r + 2f);
+                            g.DrawLine(penTickWhite, center - r - 2f, center, center - r + 2f, center);
+                            g.DrawLine(penTickWhite, center + r - 2f, center, center + r + 2f, center);
+                        }
+
+                        // 10:10 Cyber Hands
+                        using (var penHour = new System.Drawing.Pen(System.Drawing.Color.FromArgb(255, 255, 255), 2.6f) { StartCap = System.Drawing.Drawing2D.LineCap.Round, EndCap = System.Drawing.Drawing2D.LineCap.Round })
+                        using (var penMin = new System.Drawing.Pen(System.Drawing.Color.FromArgb(255, 0, 240, 255), 2.2f) { StartCap = System.Drawing.Drawing2D.LineCap.Round, EndCap = System.Drawing.Drawing2D.LineCap.Round })
+                        {
+                            // Hour hand (10 o clock)
+                            g.DrawLine(penHour, center, center, center - 5.5f, center - 5.5f);
+                            // Minute hand (2 o clock)
+                            g.DrawLine(penMin, center, center, center + 7.8f, center - 6.5f);
+                        }
+
+                        // Glowing Cyan Center Nucleus
+                        using (var brushHub = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(255, 0, 240, 255)))
+                        {
+                            g.FillEllipse(brushHub, center - 3f, center - 3f, 6f, 6f);
                         }
                     }
+
                     IntPtr hIcon = bmp.GetHicon();
                     System.Drawing.Icon icon = (System.Drawing.Icon)System.Drawing.Icon.FromHandle(hIcon).Clone();
                     DestroyIcon(hIcon);

@@ -1,0 +1,52 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F1218" />
+      <stop offset="100%" stop-color="#06080C" />
+    </linearGradient>
+    <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F0FF" />
+      <stop offset="100%" stop-color="#0099FF" />
+    </linearGradient>
+    <linearGradient id="whiteGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#CFD6E2" />
+    </linearGradient>
+    <filter id="cyanGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background Cyber Disc -->
+  <circle cx="256" cy="256" r="236" fill="url(#bgGrad)" stroke="#1B2230" stroke-width="4" />
+
+  <!-- Segmented Outer Orbit Ring -->
+  <!-- Top Arc (Cyan) -->
+  <path d="M 148 84 A 206 206 0 0 1 364 84" fill="none" stroke="url(#cyanGrad)" stroke-width="14" stroke-linecap="round" filter="url(#cyanGlow)" />
+  <!-- Right Arc (White) -->
+  <path d="M 428 148 A 206 206 0 0 1 428 364" fill="none" stroke="url(#whiteGrad)" stroke-width="10" stroke-linecap="round" opacity="0.9" />
+  <!-- Bottom Arc (Cyan) -->
+  <path d="M 364 428 A 206 206 0 0 1 148 428" fill="none" stroke="url(#cyanGrad)" stroke-width="14" stroke-linecap="round" filter="url(#cyanGlow)" />
+  <!-- Left Arc (White) -->
+  <path d="M 84 364 A 206 206 0 0 1 84 148" fill="none" stroke="url(#whiteGrad)" stroke-width="10" stroke-linecap="round" opacity="0.9" />
+
+  <!-- Cardinal Digital Ticks -->
+  <line x1="256" y1="56" x2="256" y2="82" stroke="#00F0FF" stroke-width="10" stroke-linecap="round" />
+  <line x1="456" y1="256" x2="430" y2="256" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" />
+  <line x1="256" y1="456" x2="256" y2="430" stroke="#00F0FF" stroke-width="10" stroke-linecap="round" />
+  <line x1="56" y1="256" x2="82" y2="256" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" />
+
+  <!-- Inner Cyber Tech Track -->
+  <circle cx="256" cy="256" r="148" fill="none" stroke="#222A3A" stroke-width="3" stroke-dasharray="12 16" />
+
+  <!-- Precision Minimal Clock Hands (10:10 Cyber Dynamic Angle) -->
+  <!-- Hour Hand pointing to 10:08 (Cool White) -->
+  <path d="M 256 256 L 160 160" stroke="url(#whiteGrad)" stroke-width="18" stroke-linecap="round" />
+  <!-- Minute Hand pointing to 02:10 (Neon Cyan) -->
+  <path d="M 256 256 L 362 150" stroke="url(#cyanGrad)" stroke-width="14" stroke-linecap="round" filter="url(#cyanGlow)" />
+
+  <!-- Central Cyber Nucleus Hub -->
+  <circle cx="256" cy="256" r="28" fill="#0C0E14" stroke="#00F0FF" stroke-width="8" filter="url(#cyanGlow)" />
+  <circle cx="256" cy="256" r="11" fill="#00F0FF" />
+</svg>

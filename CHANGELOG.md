@@ -1,6 +1,13 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to DesktopClock Widget are documented in this file.
+
+## [1.0.1] - 2026-08-30
+
+### Added & Enhanced
+- **Official Branding & Logo**: Minimalist cyber/futuristic clock logo with electric cyan accents and multi-resolution vector icon assets (16px to 1024px, SVG, and multi-res pp.ico).
+- **High-DPI Tray Icon**: Enhanced pixel-perfect system tray icon renderer.
+- **Migration & Deployment**: Dedicated portable runtime packaging and automated startup configuration.
 
 ## [1.0.0] - 2026-08-30
 
