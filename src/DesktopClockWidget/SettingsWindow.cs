@@ -1308,6 +1308,8 @@ namespace DesktopClock
             fontRow.Children.Add(_cmbCoreElemFont);
 
             _btnCoreElemFontFav = CreateStyledButton("\u2606", 36);
+            _btnCoreElemFontFav.ToolTip = "Toggle Favorite Font";
+            System.Windows.Automation.AutomationProperties.SetName(_btnCoreElemFontFav, "Toggle Favorite Font");
             _btnCoreElemFontFav.Click += (s, e) =>
             {
                 var elem = GetSelectedCoreElement();
@@ -1851,6 +1853,8 @@ namespace DesktopClock
             _lblCoreElemGlitchC1Hex = new TextBlock { Text = "#00FFFF", Width = 55, VerticalAlignment = VerticalAlignment.Center };
             gGhostRow.Children.Add(_lblCoreElemGlitchC1Hex);
             var btnC1 = CreateStyledButton("...", 30);
+            btnC1.ToolTip = "Choose Glitch Color 1";
+            System.Windows.Automation.AutomationProperties.SetName(btnC1, "Choose Glitch Color 1");
             btnC1.Click += (s, e) =>
             {
                 var dlg = new ColorDialog();
@@ -1875,6 +1879,8 @@ namespace DesktopClock
             _lblCoreElemGlitchC2Hex = new TextBlock { Text = "#FF0055", Width = 55, VerticalAlignment = VerticalAlignment.Center };
             gGhostRow.Children.Add(_lblCoreElemGlitchC2Hex);
             var btnC2 = CreateStyledButton("...", 30);
+            btnC2.ToolTip = "Choose Glitch Color 2";
+            System.Windows.Automation.AutomationProperties.SetName(btnC2, "Choose Glitch Color 2");
             btnC2.Click += (s, e) =>
             {
                 var dlg = new ColorDialog();
@@ -2747,6 +2753,8 @@ namespace DesktopClock
             bFontRow.Children.Add(_cmbBlockFont);
 
             _btnBlockFontFav = CreateStyledButton("\u2606", 34);
+            _btnBlockFontFav.ToolTip = "Toggle Favorite Font";
+            System.Windows.Automation.AutomationProperties.SetName(_btnBlockFontFav, "Toggle Favorite Font");
             _btnBlockFontFav.Click += (s, e) =>
             {
                 var b = GetSelectedBlock();
@@ -3185,6 +3193,8 @@ namespace DesktopClock
             _lblBlockOutlineHex = new TextBlock { Text = "#000000", Width = 60, VerticalAlignment = VerticalAlignment.Center };
             bOutRow.Children.Add(_lblBlockOutlineHex);
             var btnBOutCol = CreateStyledButton("...", 30);
+            btnBOutCol.ToolTip = "Choose Outline Color";
+            System.Windows.Automation.AutomationProperties.SetName(btnBOutCol, "Choose Outline Color");
             btnBOutCol.Click += (s, e) =>
             {
                 var dlg = new ColorDialog();
