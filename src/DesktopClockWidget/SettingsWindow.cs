@@ -1308,6 +1308,8 @@ namespace DesktopClock
             fontRow.Children.Add(_cmbCoreElemFont);
 
             _btnCoreElemFontFav = CreateStyledButton("\u2606", 36);
+            _btnCoreElemFontFav.ToolTip = "Toggle Favorite Font";
+            System.Windows.Automation.AutomationProperties.SetName(_btnCoreElemFontFav, "Toggle Favorite Font");
             _btnCoreElemFontFav.Click += (s, e) =>
             {
                 var elem = GetSelectedCoreElement();
@@ -2747,6 +2749,8 @@ namespace DesktopClock
             bFontRow.Children.Add(_cmbBlockFont);
 
             _btnBlockFontFav = CreateStyledButton("\u2606", 34);
+            _btnBlockFontFav.ToolTip = "Toggle Favorite Font";
+            System.Windows.Automation.AutomationProperties.SetName(_btnBlockFontFav, "Toggle Favorite Font");
             _btnBlockFontFav.Click += (s, e) =>
             {
                 var b = GetSelectedBlock();
