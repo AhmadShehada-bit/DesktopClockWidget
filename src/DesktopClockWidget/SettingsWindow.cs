@@ -1308,6 +1308,8 @@ namespace DesktopClock
             fontRow.Children.Add(_cmbCoreElemFont);
 
             _btnCoreElemFontFav = CreateStyledButton("\u2606", 36);
+            _btnCoreElemFontFav.ToolTip = "Toggle favorite font";
+            System.Windows.Automation.AutomationProperties.SetName(_btnCoreElemFontFav, "Toggle favorite font");
             _btnCoreElemFontFav.Click += (s, e) =>
             {
                 var elem = GetSelectedCoreElement();
@@ -1469,6 +1471,8 @@ namespace DesktopClock
             xRow.Children.Add(new TextBlock { Text = "X Offset (DIP):", Width = 100, VerticalAlignment = VerticalAlignment.Center });
 
             _btnCoreElemDecX = CreateStyledButton("-", 26);
+            _btnCoreElemDecX.ToolTip = "Decrease X Offset (Ctrl = 0.5, Shift = 10)";
+            System.Windows.Automation.AutomationProperties.SetName(_btnCoreElemDecX, "Decrease X Offset");
             _btnCoreElemDecX.Click += (s, e) =>
             {
                 double step = (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? 0.5 : ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? 10.0 : 1.0);
@@ -1508,6 +1512,8 @@ namespace DesktopClock
             xRow.Children.Add(_txtCoreElemOffsetX);
 
             _btnCoreElemIncX = CreateStyledButton("+", 26);
+            _btnCoreElemIncX.ToolTip = "Increase X Offset (Ctrl = 0.5, Shift = 10)";
+            System.Windows.Automation.AutomationProperties.SetName(_btnCoreElemIncX, "Increase X Offset");
             _btnCoreElemIncX.Click += (s, e) =>
             {
                 double step = (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? 0.5 : ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? 10.0 : 1.0);
@@ -1537,6 +1543,8 @@ namespace DesktopClock
             yRow.Children.Add(new TextBlock { Text = "Y Offset (DIP):", Width = 100, VerticalAlignment = VerticalAlignment.Center });
 
             _btnCoreElemDecY = CreateStyledButton("-", 26);
+            _btnCoreElemDecY.ToolTip = "Decrease Y Offset (Ctrl = 0.5, Shift = 10)";
+            System.Windows.Automation.AutomationProperties.SetName(_btnCoreElemDecY, "Decrease Y Offset");
             _btnCoreElemDecY.Click += (s, e) =>
             {
                 double step = (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? 0.5 : ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? 10.0 : 1.0);
@@ -1576,6 +1584,8 @@ namespace DesktopClock
             yRow.Children.Add(_txtCoreElemOffsetY);
 
             _btnCoreElemIncY = CreateStyledButton("+", 26);
+            _btnCoreElemIncY.ToolTip = "Increase Y Offset (Ctrl = 0.5, Shift = 10)";
+            System.Windows.Automation.AutomationProperties.SetName(_btnCoreElemIncY, "Increase Y Offset");
             _btnCoreElemIncY.Click += (s, e) =>
             {
                 double step = (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? 0.5 : ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? 10.0 : 1.0);
@@ -1851,6 +1861,8 @@ namespace DesktopClock
             _lblCoreElemGlitchC1Hex = new TextBlock { Text = "#00FFFF", Width = 55, VerticalAlignment = VerticalAlignment.Center };
             gGhostRow.Children.Add(_lblCoreElemGlitchC1Hex);
             var btnC1 = CreateStyledButton("...", 30);
+            btnC1.ToolTip = "Choose Glitch Ghost 1 Color";
+            System.Windows.Automation.AutomationProperties.SetName(btnC1, "Choose Glitch Ghost 1 Color");
             btnC1.Click += (s, e) =>
             {
                 var dlg = new ColorDialog();
@@ -1875,6 +1887,8 @@ namespace DesktopClock
             _lblCoreElemGlitchC2Hex = new TextBlock { Text = "#FF0055", Width = 55, VerticalAlignment = VerticalAlignment.Center };
             gGhostRow.Children.Add(_lblCoreElemGlitchC2Hex);
             var btnC2 = CreateStyledButton("...", 30);
+            btnC2.ToolTip = "Choose Glitch Ghost 2 Color";
+            System.Windows.Automation.AutomationProperties.SetName(btnC2, "Choose Glitch Ghost 2 Color");
             btnC2.Click += (s, e) =>
             {
                 var dlg = new ColorDialog();
@@ -2747,6 +2761,8 @@ namespace DesktopClock
             bFontRow.Children.Add(_cmbBlockFont);
 
             _btnBlockFontFav = CreateStyledButton("\u2606", 34);
+            _btnBlockFontFav.ToolTip = "Toggle favorite block font";
+            System.Windows.Automation.AutomationProperties.SetName(_btnBlockFontFav, "Toggle favorite block font");
             _btnBlockFontFav.Click += (s, e) =>
             {
                 var b = GetSelectedBlock();
@@ -2895,6 +2911,8 @@ namespace DesktopClock
             var rowBx = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
             rowBx.Children.Add(new TextBlock { Text = "X Offset:", Width = 70, VerticalAlignment = VerticalAlignment.Center });
             _btnBlockDecX = CreateStyledButton("-", 24);
+            _btnBlockDecX.ToolTip = "Decrease Block X Offset (Ctrl = 0.5, Shift = 10)";
+            System.Windows.Automation.AutomationProperties.SetName(_btnBlockDecX, "Decrease Block X Offset");
             _btnBlockDecX.Click += (s, e) =>
             {
                 double step = (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? 0.5 : ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? 10.0 : 1.0);
@@ -2934,6 +2952,8 @@ namespace DesktopClock
             rowBx.Children.Add(_txtBlockOffsetX);
 
             _btnBlockIncX = CreateStyledButton("+", 24);
+            _btnBlockIncX.ToolTip = "Increase Block X Offset (Ctrl = 0.5, Shift = 10)";
+            System.Windows.Automation.AutomationProperties.SetName(_btnBlockIncX, "Increase Block X Offset");
             _btnBlockIncX.Click += (s, e) =>
             {
                 double step = (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? 0.5 : ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? 10.0 : 1.0);
@@ -2962,6 +2982,8 @@ namespace DesktopClock
             var rowBy = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
             rowBy.Children.Add(new TextBlock { Text = "Y Offset:", Width = 70, VerticalAlignment = VerticalAlignment.Center });
             _btnBlockDecY = CreateStyledButton("-", 24);
+            _btnBlockDecY.ToolTip = "Decrease Block Y Offset (Ctrl = 0.5, Shift = 10)";
+            System.Windows.Automation.AutomationProperties.SetName(_btnBlockDecY, "Decrease Block Y Offset");
             _btnBlockDecY.Click += (s, e) =>
             {
                 double step = (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? 0.5 : ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? 10.0 : 1.0);
@@ -3001,6 +3023,8 @@ namespace DesktopClock
             rowBy.Children.Add(_txtBlockOffsetY);
 
             _btnBlockIncY = CreateStyledButton("+", 24);
+            _btnBlockIncY.ToolTip = "Increase Block Y Offset (Ctrl = 0.5, Shift = 10)";
+            System.Windows.Automation.AutomationProperties.SetName(_btnBlockIncY, "Increase Block Y Offset");
             _btnBlockIncY.Click += (s, e) =>
             {
                 double step = (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? 0.5 : ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? 10.0 : 1.0);
@@ -3185,6 +3209,8 @@ namespace DesktopClock
             _lblBlockOutlineHex = new TextBlock { Text = "#000000", Width = 60, VerticalAlignment = VerticalAlignment.Center };
             bOutRow.Children.Add(_lblBlockOutlineHex);
             var btnBOutCol = CreateStyledButton("...", 30);
+            btnBOutCol.ToolTip = "Choose Block Outline Color";
+            System.Windows.Automation.AutomationProperties.SetName(btnBOutCol, "Choose Block Outline Color");
             btnBOutCol.Click += (s, e) =>
             {
                 var dlg = new ColorDialog();
