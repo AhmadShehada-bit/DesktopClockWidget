@@ -1856,6 +1856,7 @@ namespace DesktopClock
             _lblCoreElemGlitchC1Hex = new TextBlock { Text = "#00FFFF", Width = 55, VerticalAlignment = VerticalAlignment.Center };
             gGhostRow.Children.Add(_lblCoreElemGlitchC1Hex);
             var btnC1 = CreateStyledButton("...", 30);
+            btnC1.ToolTip = "Choose Ghost 1 Color";
             btnC1.Click += (s, e) =>
             {
                 var dlg = new ColorDialog();
@@ -1880,6 +1881,7 @@ namespace DesktopClock
             _lblCoreElemGlitchC2Hex = new TextBlock { Text = "#FF0055", Width = 55, VerticalAlignment = VerticalAlignment.Center };
             gGhostRow.Children.Add(_lblCoreElemGlitchC2Hex);
             var btnC2 = CreateStyledButton("...", 30);
+            btnC2.ToolTip = "Choose Ghost 2 Color";
             btnC2.Click += (s, e) =>
             {
                 var dlg = new ColorDialog();
@@ -3195,6 +3197,7 @@ namespace DesktopClock
             _lblBlockOutlineHex = new TextBlock { Text = "#000000", Width = 60, VerticalAlignment = VerticalAlignment.Center };
             bOutRow.Children.Add(_lblBlockOutlineHex);
             var btnBOutCol = CreateStyledButton("...", 30);
+            btnBOutCol.ToolTip = "Choose Outline Color";
             btnBOutCol.Click += (s, e) =>
             {
                 var dlg = new ColorDialog();
