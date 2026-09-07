@@ -1,3 +1,3 @@
-## 2024-05-18 - ToolTips for Icon-Only Buttons
-**Learning:** Icon-only buttons (like "+", "-", "☆") in WPF applications can be inaccessible and confusing for users who rely on screen readers or hover for context.
-**Action:** Always add the `ToolTip` property to `Button` controls that lack descriptive text, ensuring they communicate their function clearly.
+## 2023-09-07 - Added Tooltips to ambiguous buttons
+**Learning:** Adding `ToolTip` to ambiguous buttons like "..." and "Choose..." in WPF `SettingsWindow` improves accessibility and clarity since ARIA labels aren't applicable in WPF C# native Desktop App.
+**Action:** When working on WPF C# native applications, consider using the native properties like `ToolTip` or `AutomationProperties.Name` for a11y improvements instead of the typical web ARIA equivalents.
