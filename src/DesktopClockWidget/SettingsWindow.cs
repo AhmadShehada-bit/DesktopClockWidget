@@ -467,6 +467,7 @@ namespace DesktopClock
             colorRow.Children.Add(_lblGlobalColorHex);
 
             var btnPickGlobalColor = CreateStyledButton("Choose...", 80);
+            btnPickGlobalColor.ToolTip = "Choose Global Color";
             btnPickGlobalColor.Click += (s, e) =>
             {
                 var dlg = new ColorDialog();
@@ -1389,6 +1390,7 @@ namespace DesktopClock
             _lblCoreElemColorHex = new TextBlock { Text = "#D6D3D0", Width = 70, VerticalAlignment = VerticalAlignment.Center };
             colorRow.Children.Add(_lblCoreElemColorHex);
             var btnColor = CreateStyledButton("Choose...", 75);
+            btnColor.ToolTip = "Choose Core Element Color";
             btnColor.Click += (s, e) =>
             {
                 var dlg = new ColorDialog();
@@ -1746,6 +1748,7 @@ namespace DesktopClock
             _lblCoreElemOutlineHex = new TextBlock { Text = "#000000", Width = 65, VerticalAlignment = VerticalAlignment.Center };
             outColRow.Children.Add(_lblCoreElemOutlineHex);
             var btnOutCol = CreateStyledButton("Choose...", 70);
+            btnOutCol.ToolTip = "Choose Outline Color";
             btnOutCol.Click += (s, e) =>
             {
                 var dlg = new ColorDialog();
@@ -1856,6 +1859,7 @@ namespace DesktopClock
             _lblCoreElemGlitchC1Hex = new TextBlock { Text = "#00FFFF", Width = 55, VerticalAlignment = VerticalAlignment.Center };
             gGhostRow.Children.Add(_lblCoreElemGlitchC1Hex);
             var btnC1 = CreateStyledButton("...", 30);
+            btnC1.ToolTip = "Choose Glitch Color 1";
             btnC1.Click += (s, e) =>
             {
                 var dlg = new ColorDialog();
@@ -1880,6 +1884,7 @@ namespace DesktopClock
             _lblCoreElemGlitchC2Hex = new TextBlock { Text = "#FF0055", Width = 55, VerticalAlignment = VerticalAlignment.Center };
             gGhostRow.Children.Add(_lblCoreElemGlitchC2Hex);
             var btnC2 = CreateStyledButton("...", 30);
+            btnC2.ToolTip = "Choose Glitch Color 2";
             btnC2.Click += (s, e) =>
             {
                 var dlg = new ColorDialog();
@@ -2830,6 +2835,7 @@ namespace DesktopClock
             rowCo.Children.Add(_lblBlockColorHex);
 
             var btnBColor = CreateStyledButton("Choose...", 70);
+            btnBColor.ToolTip = "Choose Block Color";
             btnBColor.Click += (s, e) =>
             {
                 var dlg = new ColorDialog();
@@ -3195,6 +3201,7 @@ namespace DesktopClock
             _lblBlockOutlineHex = new TextBlock { Text = "#000000", Width = 60, VerticalAlignment = VerticalAlignment.Center };
             bOutRow.Children.Add(_lblBlockOutlineHex);
             var btnBOutCol = CreateStyledButton("...", 30);
+            btnBOutCol.ToolTip = "Choose Block Outline Color";
             btnBOutCol.Click += (s, e) =>
             {
                 var dlg = new ColorDialog();
