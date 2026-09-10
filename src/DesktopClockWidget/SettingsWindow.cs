@@ -2382,7 +2382,7 @@ namespace DesktopClock
             mainGrid.Children.Add(_lstBlocks);
 
             var toolBar = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(8, 0, 8, 8) };
-            _btnAddBlock = CreateStyledButton("+ Add Block", 95);
+            _btnAddBlock = CreateStyledButton("+ Add Block", 95, "Add a new custom block");
             _btnAddBlock.Click += (s, e) =>
             {
                 var b = new CustomBlock { Name = "Block " + (_preview.Blocks.Count + 1), Order = _preview.Blocks.Count };
@@ -2392,7 +2392,7 @@ namespace DesktopClock
                 ApplyPreviewLive();
             };
 
-            _btnDupBlock = CreateStyledButton("Duplicate", 85);
+            _btnDupBlock = CreateStyledButton("Duplicate", 85, "Duplicate the selected block");
             _btnDupBlock.Click += (s, e) =>
             {
                 var b = _lstBlocks.SelectedItem as CustomBlock;
@@ -2404,18 +2404,21 @@ namespace DesktopClock
                 ApplyPreviewLive();
             };
 
-            _btnDelBlock = CreateStyledButton("Delete", 75);
+            _btnDelBlock = CreateStyledButton("Delete", 75, "Delete the selected block");
             _btnDelBlock.Click += (s, e) =>
             {
                 var b = _lstBlocks.SelectedItem as CustomBlock;
                 if (b == null) return;
-                _preview.Blocks.Remove(b);
-                RefreshBlocksList();
-                if (_lstBlocks.Items.Count > 0) _lstBlocks.SelectedIndex = 0;
-                ApplyPreviewLive();
+                if (MessageBox.Show("Are you sure you want to delete this custom block?", "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+                {
+                    _preview.Blocks.Remove(b);
+                    RefreshBlocksList();
+                    if (_lstBlocks.Items.Count > 0) _lstBlocks.SelectedIndex = 0;
+                    ApplyPreviewLive();
+                }
             };
 
-            _btnMoveUpBlock = CreateStyledButton("\u2191 Up", 65);
+            _btnMoveUpBlock = CreateStyledButton("\u2191 Up", 65, "Move block up in order");
             _btnMoveUpBlock.Click += (s, e) =>
             {
                 int idx = _lstBlocks.SelectedIndex;
@@ -2431,7 +2434,7 @@ namespace DesktopClock
                 }
             };
 
-            _btnMoveDownBlock = CreateStyledButton("\u2193 Down", 75);
+            _btnMoveDownBlock = CreateStyledButton("\u2193 Down", 75, "Move block down in order");
             _btnMoveDownBlock.Click += (s, e) =>
             {
                 int idx = _lstBlocks.SelectedIndex;
