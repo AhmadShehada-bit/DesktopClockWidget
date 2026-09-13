@@ -466,7 +466,7 @@ namespace DesktopClock
             _lblGlobalColorHex = new TextBlock { Text = "#D6D3D0", Width = 75, VerticalAlignment = VerticalAlignment.Center };
             colorRow.Children.Add(_lblGlobalColorHex);
 
-            var btnPickGlobalColor = CreateStyledButton("Choose...", 80);
+            var btnPickGlobalColor = CreateStyledButton("Choose...", 80, "Choose Global Color");
             btnPickGlobalColor.Click += (s, e) =>
             {
                 var dlg = new ColorDialog();
@@ -619,7 +619,7 @@ namespace DesktopClock
             _txtThemeSearch.TextChanged += (s, e) => PopulateThemesList();
             topBar.Children.Add(_txtThemeSearch);
 
-            _btnSaveThemePreset = CreateStyledButton("+ Save As Preset...", 140);
+            _btnSaveThemePreset = CreateStyledButton("+ Save As Preset...", 140, "Save As Theme Preset");
             _btnSaveThemePreset.Margin = new Thickness(12, 0, 0, 0);
             _btnSaveThemePreset.Click += (s, e) => ShowSavePresetDialog();
             topBar.Children.Add(_btnSaveThemePreset);
@@ -696,11 +696,11 @@ namespace DesktopClock
             _btnApplyTheme.Click += (s, e) => ApplySelectedThemeLive();
             actionRow.Children.Add(_btnApplyTheme);
 
-            _btnDuplicateThemePreset = CreateStyledButton("Duplicate as Custom", 130);
+            _btnDuplicateThemePreset = CreateStyledButton("Duplicate as Custom", 130, "Duplicate Theme as Custom");
             _btnDuplicateThemePreset.Click += (s, e) => DuplicateSelectedTheme();
             actionRow.Children.Add(_btnDuplicateThemePreset);
 
-            _btnRenameThemePreset = CreateStyledButton("✎ Rename...", 90);
+            _btnRenameThemePreset = CreateStyledButton("✎ Rename...", 90, "Rename Theme Preset");
             _btnRenameThemePreset.Click += (s, e) => ShowRenamePresetDialog();
             actionRow.Children.Add(_btnRenameThemePreset);
 
@@ -1387,7 +1387,7 @@ namespace DesktopClock
             colorRow.Children.Add(_rectCoreElemColorSwatch);
             _lblCoreElemColorHex = new TextBlock { Text = "#D6D3D0", Width = 70, VerticalAlignment = VerticalAlignment.Center };
             colorRow.Children.Add(_lblCoreElemColorHex);
-            var btnColor = CreateStyledButton("Choose...", 75);
+            var btnColor = CreateStyledButton("Choose...", 75, "Choose Element Color");
             btnColor.Click += (s, e) =>
             {
                 var dlg = new ColorDialog();
@@ -1740,7 +1740,7 @@ namespace DesktopClock
             outColRow.Children.Add(_rectCoreElemOutlineSwatch);
             _lblCoreElemOutlineHex = new TextBlock { Text = "#000000", Width = 65, VerticalAlignment = VerticalAlignment.Center };
             outColRow.Children.Add(_lblCoreElemOutlineHex);
-            var btnOutCol = CreateStyledButton("Choose...", 70);
+            var btnOutCol = CreateStyledButton("Choose...", 70, "Choose Outline Color");
             btnOutCol.Click += (s, e) =>
             {
                 var dlg = new ColorDialog();
@@ -2676,7 +2676,7 @@ namespace DesktopClock
                 RefreshBlockMessagesList();
                 ApplyPreviewLive();
             };
-            _btnDelBlockMsg = CreateStyledButton("Delete", 60);
+            _btnDelBlockMsg = CreateStyledButton("Delete", 60, "Delete Message");
             _btnDelBlockMsg.Click += (s, e) =>
             {
                 var b = GetSelectedBlock();
@@ -2711,7 +2711,7 @@ namespace DesktopClock
                 RefreshBlockScheduleList();
                 ApplyPreviewLive();
             };
-            _btnDelSchedule = CreateStyledButton("Delete", 60);
+            _btnDelSchedule = CreateStyledButton("Delete", 60, "Delete Schedule");
             _btnDelSchedule.Click += (s, e) =>
             {
                 var b = GetSelectedBlock();
@@ -2826,7 +2826,7 @@ namespace DesktopClock
             _lblBlockColorHex = new TextBlock { Text = "#D6D3D0", Width = 65, VerticalAlignment = VerticalAlignment.Center };
             rowCo.Children.Add(_lblBlockColorHex);
 
-            var btnBColor = CreateStyledButton("Choose...", 70);
+            var btnBColor = CreateStyledButton("Choose...", 70, "Choose Block Color");
             btnBColor.Click += (s, e) =>
             {
                 var dlg = new ColorDialog();
@@ -3989,7 +3989,7 @@ namespace DesktopClock
             _btnAddTimezone.Click += (s, e) => ShowAddTimezoneDialog();
             btnBar.Children.Add(_btnAddTimezone);
 
-            _btnDeleteTimezone = CreateStyledButton("Delete", 80);
+            _btnDeleteTimezone = CreateStyledButton("Delete", 80, "Delete Timezone");
             _btnDeleteTimezone.Margin = new Thickness(8, 0, 0, 0);
             _btnDeleteTimezone.Click += (s, e) =>
             {
