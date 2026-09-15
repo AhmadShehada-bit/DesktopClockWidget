@@ -630,9 +630,10 @@ namespace DesktopClock
             // Preset Cards ListBox
             _lstThemes = new ListBox
             {
-                Background = new SolidColorBrush(Color.FromRgb(28, 30, 33)),
+                Background = new SolidColorBrush(Color.FromRgb(20, 22, 26)),
                 Foreground = Brushes.White,
-                BorderBrush = new SolidColorBrush(Color.FromRgb(50, 52, 58)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(75, 85, 99)),
+                BorderThickness = new Thickness(1),
                 Margin = new Thickness(0, 0, 0, 8),
                 HorizontalContentAlignment = HorizontalAlignment.Stretch
             };
@@ -2372,11 +2373,16 @@ namespace DesktopClock
 
             _lstBlocks = new ListBox
             {
-                Background = new SolidColorBrush(Color.FromRgb(28, 30, 33)),
+                Background = new SolidColorBrush(Color.FromRgb(20, 22, 26)),
                 Foreground = Brushes.White,
-                BorderBrush = new SolidColorBrush(Color.FromRgb(50, 52, 58)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(75, 85, 99)),
+                BorderThickness = new Thickness(1),
                 Margin = new Thickness(8)
             };
+            var lbItemStyle = new Style(typeof(ListBoxItem));
+            lbItemStyle.Setters.Add(new Setter(ListBoxItem.ForegroundProperty, new SolidColorBrush(Color.FromRgb(240, 240, 240))));
+            lbItemStyle.Setters.Add(new Setter(ListBoxItem.PaddingProperty, new Thickness(6, 4, 6, 4)));
+            _lstBlocks.ItemContainerStyle = lbItemStyle;
             _lstBlocks.SelectionChanged += (s, e) => LoadSelectedBlockValues();
             Grid.SetRow(_lstBlocks, 0);
             mainGrid.Children.Add(_lstBlocks);
@@ -2385,7 +2391,8 @@ namespace DesktopClock
             _btnAddBlock = CreateStyledButton("+ Add Block", 95, "Add a new custom block");
             _btnAddBlock.Click += (s, e) =>
             {
-                var b = new CustomBlock { Name = "Block " + (_preview.Blocks.Count + 1), Order = _preview.Blocks.Count };
+                int nextOrder = _preview.Blocks.Count > 0 ? _preview.Blocks.Max(x => x.Order) + 1 : 0;
+                var b = new CustomBlock { Name = "Block " + (_preview.Blocks.Count + 1), Order = nextOrder, SymbolContent = "\u2726" };
                 _preview.Blocks.Add(b);
                 RefreshBlocksList();
                 _lstBlocks.SelectedItem = b;
@@ -2398,6 +2405,8 @@ namespace DesktopClock
                 var b = _lstBlocks.SelectedItem as CustomBlock;
                 if (b == null) return;
                 var dup = b.Clone();
+                int nextOrder = _preview.Blocks.Count > 0 ? _preview.Blocks.Max(x => x.Order) + 1 : 0;
+                dup.Order = nextOrder;
                 _preview.Blocks.Add(dup);
                 RefreshBlocksList();
                 _lstBlocks.SelectedItem = dup;
@@ -2412,6 +2421,7 @@ namespace DesktopClock
                 if (MessageBox.Show("Are you sure you want to delete this custom block?", "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
                 {
                     _preview.Blocks.Remove(b);
+                    for (int i = 0; i < _preview.Blocks.Count; i++) _preview.Blocks[i].Order = i;
                     RefreshBlocksList();
                     if (_lstBlocks.Items.Count > 0) _lstBlocks.SelectedIndex = 0;
                     ApplyPreviewLive();
@@ -2421,32 +2431,56 @@ namespace DesktopClock
             _btnMoveUpBlock = CreateStyledButton("\u2191 Up", 65, "Move block up in order");
             _btnMoveUpBlock.Click += (s, e) =>
             {
-                int idx = _lstBlocks.SelectedIndex;
-                if (idx > 0)
+                var item = _lstBlocks.SelectedItem as CustomBlock;
+                if (item != null)
                 {
-                    var item = _preview.Blocks[idx];
-                    _preview.Blocks.RemoveAt(idx);
-                    _preview.Blocks.Insert(idx - 1, item);
-                    for (int i = 0; i < _preview.Blocks.Count; i++) _preview.Blocks[i].Order = i;
-                    RefreshBlocksList();
-                    _lstBlocks.SelectedIndex = idx - 1;
-                    ApplyPreviewLive();
+                    var sorted = _preview.Blocks.OrderBy(x => x.Order).ToList();
+                    int idx = sorted.IndexOf(item);
+                    if (idx > 0)
+                    {
+                        var prev = sorted[idx - 1];
+                        int tmp = item.Order;
+                        item.Order = prev.Order;
+                        prev.Order = tmp;
+                        if (item.Order == prev.Order)
+                        {
+                            item.Order = idx - 1;
+                            prev.Order = idx;
+                        }
+                        _preview.Blocks.Sort((a, c) => a.Order.CompareTo(c.Order));
+                        for (int i = 0; i < _preview.Blocks.Count; i++) _preview.Blocks[i].Order = i;
+                        RefreshBlocksList();
+                        _lstBlocks.SelectedItem = item;
+                        ApplyPreviewLive();
+                    }
                 }
             };
 
             _btnMoveDownBlock = CreateStyledButton("\u2193 Down", 75, "Move block down in order");
             _btnMoveDownBlock.Click += (s, e) =>
             {
-                int idx = _lstBlocks.SelectedIndex;
-                if (idx >= 0 && idx < _preview.Blocks.Count - 1)
+                var item = _lstBlocks.SelectedItem as CustomBlock;
+                if (item != null)
                 {
-                    var item = _preview.Blocks[idx];
-                    _preview.Blocks.RemoveAt(idx);
-                    _preview.Blocks.Insert(idx + 1, item);
-                    for (int i = 0; i < _preview.Blocks.Count; i++) _preview.Blocks[i].Order = i;
-                    RefreshBlocksList();
-                    _lstBlocks.SelectedIndex = idx + 1;
-                    ApplyPreviewLive();
+                    var sorted = _preview.Blocks.OrderBy(x => x.Order).ToList();
+                    int idx = sorted.IndexOf(item);
+                    if (idx >= 0 && idx < sorted.Count - 1)
+                    {
+                        var next = sorted[idx + 1];
+                        int tmp = item.Order;
+                        item.Order = next.Order;
+                        next.Order = tmp;
+                        if (item.Order == next.Order)
+                        {
+                            item.Order = idx + 1;
+                            next.Order = idx;
+                        }
+                        _preview.Blocks.Sort((a, c) => a.Order.CompareTo(c.Order));
+                        for (int i = 0; i < _preview.Blocks.Count; i++) _preview.Blocks[i].Order = i;
+                        RefreshBlocksList();
+                        _lstBlocks.SelectedItem = item;
+                        ApplyPreviewLive();
+                    }
                 }
             };
 
@@ -2461,11 +2495,12 @@ namespace DesktopClock
 
             _blockInspectorPanel = new Border
             {
-                BorderBrush = new SolidColorBrush(Color.FromRgb(50, 52, 58)),
+                Background = new SolidColorBrush(Color.FromRgb(26, 28, 32)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(75, 85, 99)),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(4),
                 Margin = new Thickness(8),
-                Padding = new Thickness(6)
+                Padding = new Thickness(8)
             };
 
             var inspectorScroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
@@ -2487,20 +2522,20 @@ namespace DesktopClock
             {
                 if (_isUpdatingUi) return;
                 var b = GetSelectedBlock();
-                if (b != null) { b.Name = _txtBlockName.Text; RefreshBlocksList(); }
+                if (b != null) { b.Name = _txtBlockName.Text; _lstBlocks.Items.Refresh(); }
             };
             topRow.Children.Add(_txtBlockName);
 
             topRow.Children.Add(new TextBlock { Text = "Order:", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 4, 0) });
             _txtBlockOrder = CreateTextBox(40);
-            _txtBlockOrder.TextChanged += (s, e) =>
+            _txtBlockOrder.LostFocus += (s, e) =>
             {
                 if (_isUpdatingUi) return;
                 int ord;
                 if (int.TryParse(_txtBlockOrder.Text, out ord))
                 {
                     var b = GetSelectedBlock();
-                    if (b != null) { b.Order = ord; ApplyPreviewLive(); }
+                    if (b != null) { b.Order = ord; RefreshBlocksList(); ApplyPreviewLive(); }
                 }
             };
             topRow.Children.Add(_txtBlockOrder);
@@ -2660,9 +2695,10 @@ namespace DesktopClock
             _lstBlockMessages = new ListBox
             {
                 Height = 70,
-                Background = new SolidColorBrush(Color.FromRgb(24, 26, 28)),
+                Background = new SolidColorBrush(Color.FromRgb(20, 22, 26)),
                 Foreground = Brushes.White,
-                BorderBrush = new SolidColorBrush(Color.FromRgb(50, 52, 58))
+                BorderBrush = new SolidColorBrush(Color.FromRgb(75, 85, 99)),
+                BorderThickness = new Thickness(1)
             };
             _panelBlockInterval.Children.Add(_lstBlockMessages);
 
@@ -2695,9 +2731,10 @@ namespace DesktopClock
             _lstBlockSchedules = new ListBox
             {
                 Height = 70,
-                Background = new SolidColorBrush(Color.FromRgb(24, 26, 28)),
+                Background = new SolidColorBrush(Color.FromRgb(20, 22, 26)),
                 Foreground = Brushes.White,
-                BorderBrush = new SolidColorBrush(Color.FromRgb(50, 52, 58))
+                BorderBrush = new SolidColorBrush(Color.FromRgb(75, 85, 99)),
+                BorderThickness = new Thickness(1)
             };
             _panelBlockSchedule.Children.Add(_lstBlockSchedules);
 
@@ -2746,6 +2783,18 @@ namespace DesktopClock
                     UpdateBlockFontMetadata();
                     ApplyPreviewLive();
                 }
+            };
+            bFontRow.PreviewMouseWheel += (s, e) =>
+            {
+                if (_cmbBlockFont.Items.Count == 0) return;
+                int step = (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? 5 : ((Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? 10 : 1);
+                int delta = e.Delta < 0 ? step : -step;
+                int cur = _cmbBlockFont.SelectedIndex >= 0 ? _cmbBlockFont.SelectedIndex : 0;
+                int count = _cmbBlockFont.Items.Count;
+                int next = (cur + delta) % count;
+                if (next < 0) next += count;
+                _cmbBlockFont.SelectedIndex = next;
+                e.Handled = true;
             };
             bFontRow.Children.Add(_cmbBlockFont);
 
@@ -3301,18 +3350,54 @@ namespace DesktopClock
         private void RefreshBlocksList()
         {
             if (_lstBlocks == null || _preview.Blocks == null) return;
-            var cur = _lstBlocks.SelectedItem;
-            _lstBlocks.Items.Clear();
-            foreach (var b in _preview.Blocks.OrderBy(x => x.Order))
+            string selectedId = null;
+            var cur = _lstBlocks.SelectedItem as CustomBlock;
+            if (cur != null) selectedId = cur.Id;
+
+            _isUpdatingUi = true;
+            try
             {
-                _lstBlocks.Items.Add(b);
+                _lstBlocks.Items.Clear();
+                foreach (var b in _preview.Blocks.OrderBy(x => x.Order))
+                {
+                    _lstBlocks.Items.Add(b);
+                }
             }
-            if (cur != null && _lstBlocks.Items.Contains(cur)) _lstBlocks.SelectedItem = cur;
-            else if (_lstBlocks.Items.Count > 0) _lstBlocks.SelectedIndex = 0;
+            finally
+            {
+                _isUpdatingUi = false;
+            }
+
+            CustomBlock toSelect = null;
+            if (selectedId != null)
+            {
+                foreach (var item in _lstBlocks.Items)
+                {
+                    var cb = item as CustomBlock;
+                    if (cb != null && cb.Id == selectedId)
+                    {
+                        toSelect = cb;
+                        break;
+                    }
+                }
+            }
+            if (toSelect != null)
+            {
+                _lstBlocks.SelectedItem = toSelect;
+            }
+            else if (_lstBlocks.Items.Count > 0)
+            {
+                _lstBlocks.SelectedIndex = 0;
+            }
+            else
+            {
+                LoadSelectedBlockValues();
+            }
         }
 
         private void LoadSelectedBlockValues()
         {
+            if (_isUpdatingUi) return;
             var b = GetSelectedBlock();
             if (b == null)
             {
@@ -3511,9 +3596,10 @@ namespace DesktopClock
 
             _lstCatalogFonts = new ListBox
             {
-                Background = new SolidColorBrush(Color.FromRgb(28, 30, 33)),
+                Background = new SolidColorBrush(Color.FromRgb(20, 22, 26)),
                 Foreground = Brushes.White,
-                BorderBrush = new SolidColorBrush(Color.FromRgb(50, 52, 58)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(75, 85, 99)),
+                BorderThickness = new Thickness(1),
                 Margin = new Thickness(0, 0, 0, 8)
             };
             VirtualizingStackPanel.SetIsVirtualizing(_lstCatalogFonts, true);
@@ -3971,8 +4057,9 @@ namespace DesktopClock
 
             _lstTimezones = new ListBox
             {
-                Background = new SolidColorBrush(Color.FromRgb(28, 30, 34)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(50, 52, 58)),
+                Background = new SolidColorBrush(Color.FromRgb(20, 22, 26)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(75, 85, 99)),
+                BorderThickness = new Thickness(1),
                 Foreground = Brushes.White
             };
             Grid.SetRow(_lstTimezones, 1);
@@ -4270,35 +4357,45 @@ namespace DesktopClock
             return new GroupBox
             {
                 Header = " " + header + " ",
-                Foreground = Brushes.LightGray,
-                BorderBrush = new SolidColorBrush(Color.FromRgb(50, 52, 58)),
+                Foreground = new SolidColorBrush(Color.FromRgb(226, 232, 240)),
+                FontWeight = FontWeights.SemiBold,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(75, 85, 99)),
                 Margin = new Thickness(0, 0, 0, 10)
             };
         }
 
         private static TextBox CreateTextBox(double width)
         {
-            return new TextBox
+            var tb = new TextBox
             {
                 Width = width,
-                Background = new SolidColorBrush(Color.FromRgb(24, 26, 28)),
+                Background = new SolidColorBrush(Color.FromRgb(20, 22, 26)),
                 Foreground = Brushes.White,
-                BorderBrush = new SolidColorBrush(Color.FromRgb(60, 62, 68)),
+                CaretBrush = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(75, 85, 99)),
                 VerticalAlignment = VerticalAlignment.Center,
-                Padding = new Thickness(3, 2, 3, 2)
+                Padding = new Thickness(5, 3, 5, 3)
             };
+            tb.GotFocus += (s, e) => { tb.BorderBrush = new SolidColorBrush(Color.FromRgb(0, 240, 255)); };
+            tb.LostFocus += (s, e) => { tb.BorderBrush = new SolidColorBrush(Color.FromRgb(75, 85, 99)); };
+            return tb;
         }
 
         private static ComboBox CreateComboBox(double width)
         {
-            return new ComboBox
+            var cb = new ComboBox
             {
                 Width = width,
-                Background = new SolidColorBrush(Color.FromRgb(24, 26, 28)),
-                Foreground = Brushes.Black,
-                BorderBrush = new SolidColorBrush(Color.FromRgb(60, 62, 68)),
+                Background = new SolidColorBrush(Color.FromRgb(28, 30, 35)),
+                Foreground = new SolidColorBrush(Color.FromRgb(240, 240, 240)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(75, 85, 99)),
                 VerticalAlignment = VerticalAlignment.Center
             };
+            var itemStyle = new Style(typeof(ComboBoxItem));
+            itemStyle.Setters.Add(new Setter(ComboBoxItem.ForegroundProperty, new SolidColorBrush(Color.FromRgb(240, 240, 240))));
+            itemStyle.Setters.Add(new Setter(ComboBoxItem.BackgroundProperty, new SolidColorBrush(Color.FromRgb(32, 34, 40))));
+            cb.ItemContainerStyle = itemStyle;
+            return cb;
         }
 
         private static Button CreateStyledButton(string text, double width)
@@ -4308,9 +4405,9 @@ namespace DesktopClock
                 Content = text,
                 Width = width,
                 Height = 26,
-                Background = new SolidColorBrush(Color.FromRgb(45, 48, 54)),
-                Foreground = Brushes.White,
-                BorderBrush = new SolidColorBrush(Color.FromRgb(70, 72, 80)),
+                Background = new SolidColorBrush(Color.FromRgb(40, 44, 52)),
+                Foreground = new SolidColorBrush(Color.FromRgb(240, 240, 240)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(80, 90, 105)),
                 Margin = new Thickness(0, 0, 6, 0)
             };
         }

@@ -1,4 +1,4 @@
-﻿using System.Threading;
+using System.Threading;
 using System.Net;
 using System.Text.RegularExpressions;
 using System;
@@ -210,7 +210,7 @@ namespace DesktopClock
             Type = "Symbol";
             Position = "Above Widget";
             Order = 0;
-            SymbolContent = "âœ¦";
+            SymbolContent = "\u2726";
             StaticContent = "STAY FOCUSED";
             Messages = new List<string> { "KEEP GOING", "FOCUS ON THE NEXT STEP", "BUILD SOMETHING TODAY", "NO ZERO DAYS" };
             RotationMode = "Sequential";
@@ -283,7 +283,7 @@ namespace DesktopClock
                 switch (Type)
                 {
                     case "Symbol":
-                        displayName = "Symbol Block (" + (SymbolContent ?? "âœ¦") + ")";
+                        displayName = "Symbol Block (" + (SymbolContent ?? "\u2726") + ")";
                         break;
                     case "Static Text":
                         displayName = !string.IsNullOrEmpty(StaticContent) ? ("Static: " + (StaticContent.Length > 22 ? StaticContent.Substring(0, 20) + "..." : StaticContent)) : "Static Text";
@@ -1510,7 +1510,7 @@ namespace DesktopClock
 
         public static readonly string[] RequiredSymbols = new string[]
         {
-            "âœ¦", "âœ§", "â—‡", "â—†", "âŸ¡", "â‹„", "â€¢", "â—‹", "â—", "â–³", "â–½", "âŒ", "âˆž", "+", "Ã—", "|"
+            "\u2726", "\u2727", "\u25C7", "\u25C6", "\u27E1", "\u22C4", "\u2022", "\u25CB", "\u25CF", "\u25B3", "\u25BD", "\u2301", "\u221E", "+", "\u00D7", "|"
         };
 
         public static List<string> GetValidSymbols()
@@ -2130,7 +2130,7 @@ namespace DesktopClock
             if (block == null || !block.Enabled) return "";
             if (string.Equals(block.Type, "Symbol", StringComparison.OrdinalIgnoreCase))
             {
-                return !string.IsNullOrEmpty(block.SymbolContent) ? block.SymbolContent : "âœ¦";
+                return !string.IsNullOrEmpty(block.SymbolContent) ? block.SymbolContent : "\u2726";
             }
             if (string.Equals(block.Type, "Static Text", StringComparison.OrdinalIgnoreCase) || string.Equals(block.Type, "Static", StringComparison.OrdinalIgnoreCase))
             {
@@ -2813,6 +2813,7 @@ namespace DesktopClock
         private const uint VK_C = 0x43;
         private const int HOTKEY_ID = 9001;
         private const int WM_HOTKEY = 0x0312;
+        private const int WM_TIMECHANGE = 0x001E;
 
         [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
         private static extern uint RegisterWindowMessage(string lpString);
@@ -3054,7 +3055,7 @@ namespace DesktopClock
                     FontWeight = Fonts.ParseWeight(b.FontWeight),
                     FontStyle = b.Italic ? FontStyles.Italic : FontStyles.Normal,
                     FontSize = Math.Max(6, b.FontSize),
-                    Margin = new Thickness(0, 1, 0, 1),
+                    Margin = new Thickness(0, 3, 0, 3),
                     Tag = b.Id,
                     Effects = b.Effects != null ? b.Effects.Clone() : new TextEffectSettings(),
                     IsSelectedForEdit = string.Equals(_activeHighlightedElementKey, b.Id, StringComparison.OrdinalIgnoreCase)
@@ -3491,7 +3492,7 @@ namespace DesktopClock
                 }), DispatcherPriority.ApplicationIdle, null);
             }), DispatcherPriority.Loaded, null);
 
-            _timeTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            _timeTimer = new DispatcherTimer(DispatcherPriority.Normal) { Interval = TimeSpan.FromSeconds(1) };
             _timeTimer.Tick += TimeTimer_Tick;
             _timeTimer.Start();
 
@@ -3508,6 +3509,20 @@ namespace DesktopClock
                 SetEditing(!_editing);
                 handled = true;
             }
+            else if (msg == WM_TIMECHANGE)
+            {
+                try
+                {
+                    TimeZoneInfo.ClearCachedData();
+                    _lastRenderedMinute = -1;
+                    _lastRenderedHour = -1;
+                    _lastRenderedDay = -1;
+                    UpdateDateTime(true);
+                    ApplyGreeting();
+                }
+                catch { }
+                handled = true;
+            }
             else if (_wmTaskbarCreated != 0 && (uint)msg == _wmTaskbarCreated)
             {
                 CreateTrayIcon();
@@ -3518,6 +3533,7 @@ namespace DesktopClock
 
         private void ClockWindow_Closing(object sender, CancelEventArgs e)
         {
+            LogTrayDebug("ClockWindow_Closing entered, isClosing=" + _isClosing);
             if (_isClosing) return;
             _isClosing = true;
             if (_timeTimer != null) _timeTimer.Stop();
@@ -3665,14 +3681,25 @@ namespace DesktopClock
 
         private void TimeTimer_Tick(object sender, EventArgs e)
         {
-            var now = DateTime.Now;
-            UpdateDateTime(false);
-            if (_settings != null && _settings.GreetingMode == 0 && now.Hour != _lastRenderedHour)
+            try
             {
-                _lastRenderedHour = now.Hour;
-                ApplyGreeting();
+                var now = DateTime.Now;
+                if (now.Minute != _lastRenderedMinute)
+                {
+                    try { TimeZoneInfo.ClearCachedData(); } catch { }
+                }
+                UpdateDateTime(false);
+                if (_settings != null && _settings.GreetingMode == 0 && now.Hour != _lastRenderedHour)
+                {
+                    _lastRenderedHour = now.Hour;
+                    ApplyGreeting();
+                }
+                UpdateRotatingBlocks();
             }
-            UpdateRotatingBlocks();
+            catch (Exception ex)
+            {
+                Debug.WriteLine("TimeTimer error: " + ex);
+            }
         }
 
         public void UpdateDateTime()
@@ -3682,48 +3709,65 @@ namespace DesktopClock
 
         public void UpdateDateTime(bool force)
         {
-            var now = DateTime.Now;
-            var culture = CultureInfo.InvariantCulture;
-
-            if (force || now.Minute != _lastRenderedMinute)
+            try
             {
-                _lastRenderedMinute = now.Minute;
-                string newTime = now.ToString("hh:mm tt", culture);
-                if (_timeText.Text != newTime) _timeText.Text = newTime;
-            }
+                var now = DateTime.Now;
+                var culture = CultureInfo.InvariantCulture;
 
-            if (force || now.Day != _lastRenderedDay)
-            {
-                _lastRenderedDay = now.Day;
-                string weekday = now.ToString("dddd", culture);
-                string newWeekday = TextCaseHelper.ApplyCase(weekday, _settings.Weekday != null ? _settings.Weekday.Case : "Title");
-                if (_weekdayText.Text != newWeekday) _weekdayText.Text = newWeekday;
-
-                string date = now.ToString("dd MMM", culture);
-                string newDate = TextCaseHelper.ApplyCase(date, _settings.Date != null ? _settings.Date.Case : "Upper");
-                if (_dateText.Text != newDate) _dateText.Text = newDate;
-            }
-
-            // Update secondary timezone clocks
-            if (_settings.Timezones != null && _timezoneElements.Count > 0)
-            {
-                var utcNow = DateTime.UtcNow;
-                foreach (var tz in _settings.Timezones)
+                if (_timeText != null && (force || now.Minute != _lastRenderedMinute))
                 {
-                    if (tz == null || !tz.Enabled || !_timezoneElements.ContainsKey(tz.Id)) continue;
-                    try
+                    _lastRenderedMinute = now.Minute;
+                    string newTime = now.ToString("hh:mm tt", culture);
+                    if (_settings != null && _settings.Time != null && !string.IsNullOrEmpty(_settings.Time.Case))
                     {
-                        var zoneInfo = TimeZoneInfo.FindSystemTimeZoneById(tz.TimeZoneId);
-                        var tzTime = TimeZoneInfo.ConvertTimeFromUtc(utcNow, zoneInfo);
-                        string fmt = tz.Use24Hour ? "HH:mm" : "hh:mm tt";
-                        string str = string.Format("{0} {1}", tz.CustomLabel, tzTime.ToString(fmt, CultureInfo.InvariantCulture));
-                        _timezoneElements[tz.Id].Text = str;
+                        newTime = TextCaseHelper.ApplyCase(newTime, _settings.Time.Case);
                     }
-                    catch
+                    if (_timeText.Text != newTime) _timeText.Text = newTime;
+                }
+
+                if (force || now.Day != _lastRenderedDay)
+                {
+                    _lastRenderedDay = now.Day;
+                    if (_weekdayText != null)
                     {
-                        _timezoneElements[tz.Id].Text = tz.CustomLabel + " --:--";
+                        string weekday = now.ToString("dddd", culture);
+                        string newWeekday = TextCaseHelper.ApplyCase(weekday, (_settings != null && _settings.Weekday != null) ? _settings.Weekday.Case : "Title");
+                        if (_weekdayText.Text != newWeekday) _weekdayText.Text = newWeekday;
+                    }
+
+                    if (_dateText != null)
+                    {
+                        string date = now.ToString("dd MMM", culture);
+                        string newDate = TextCaseHelper.ApplyCase(date, (_settings != null && _settings.Date != null) ? _settings.Date.Case : "Upper");
+                        if (_dateText.Text != newDate) _dateText.Text = newDate;
                     }
                 }
+
+                // Update secondary timezone clocks
+                if (_settings != null && _settings.Timezones != null && _timezoneElements != null && _timezoneElements.Count > 0)
+                {
+                    var utcNow = DateTime.UtcNow;
+                    foreach (var tz in _settings.Timezones)
+                    {
+                        if (tz == null || !tz.Enabled || !_timezoneElements.ContainsKey(tz.Id) || _timezoneElements[tz.Id] == null) continue;
+                        try
+                        {
+                            var zoneInfo = TimeZoneInfo.FindSystemTimeZoneById(tz.TimeZoneId);
+                            var tzTime = TimeZoneInfo.ConvertTimeFromUtc(utcNow, zoneInfo);
+                            string fmt = tz.Use24Hour ? "HH:mm" : "hh:mm tt";
+                            string str = string.Format("{0} {1}", tz.CustomLabel, tzTime.ToString(fmt, culture));
+                            _timezoneElements[tz.Id].Text = str;
+                        }
+                        catch
+                        {
+                            _timezoneElements[tz.Id].Text = tz.CustomLabel + " --:--";
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("UpdateDateTime error: " + ex);
             }
         }
 
@@ -4125,12 +4169,21 @@ namespace DesktopClock
                     createdNew = true;
                 }
             }
-            if (!createdNew) return;
+            if (!createdNew)
+            {
+                ClockWindow.LogTrayDebug("SingleInstance mutex already held, exiting duplicate instance.");
+                return;
+            }
 
+            ClockWindow.LogTrayDebug("Main: Starting WPF Application");
             var app = new App();
             app.DispatcherUnhandledException += (s, e) =>
             {
                 ClockWindow.LogTrayDebug("CRITICAL DISPATCHER EXCEPTION: " + e.Exception.ToString());
+            };
+            app.Exit += (s, e) =>
+            {
+                ClockWindow.LogTrayDebug("App.Exit triggered with code: " + e.ApplicationExitCode);
             };
             _mainWindow = new ClockWindow();
             app.Run(_mainWindow);
