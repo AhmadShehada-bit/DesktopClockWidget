@@ -146,6 +146,14 @@ namespace DesktopClock
         private ComboBox _cmbBlockPresetSymbol;
         private TextBox _txtBlockCustomSymbol;
 
+        // Block Content: Corner
+        private StackPanel _panelBlockCorner;
+        private ComboBox _cmbBlockCornerShape;
+        private Button _btnCornerTopLeft;
+        private Button _btnCornerTopRight;
+        private Button _btnCornerBottomLeft;
+        private Button _btnCornerBottomRight;
+
         // Block Content: Static
         private StackPanel _panelBlockStatic;
         private TextBox _txtBlockStaticText;
@@ -488,13 +496,13 @@ namespace DesktopClock
             var stackScale = new StackPanel { Margin = new Thickness(8) };
             var scaleRow = new StackPanel { Orientation = Orientation.Horizontal };
             scaleRow.Children.Add(new TextBlock { Text = "Scale:", Width = 90, VerticalAlignment = VerticalAlignment.Center });
-            _sliderMasterScale = new Slider { Minimum = 40, Maximum = 300, Value = 100, Width = 220, VerticalAlignment = VerticalAlignment.Center };
+            _sliderMasterScale = CreateStyledSlider(40, 300, 100, 220, 1.0);
             _sliderMasterScale.ValueChanged += (s, e) =>
             {
                 if (_isUpdatingUi) return;
                 _preview.Scale = Math.Round(_sliderMasterScale.Value) / 100.0;
                 _lblMasterScale.Text = ((int)Math.Round(_sliderMasterScale.Value)) + "%";
-                ApplyPreviewLive();
+                SchedulePreviewLive();
             };
             scaleRow.Children.Add(_sliderMasterScale);
             _lblMasterScale = new TextBlock { Text = "100%", Width = 50, Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
@@ -1371,13 +1379,20 @@ namespace DesktopClock
                 }
             };
             szRow.Children.Add(_txtCoreElemFontSize);
-            _sliderCoreElemFontSize = new Slider { Minimum = 8, Maximum = 160, Value = 40, Width = 160, Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            _sliderCoreElemFontSize = CreateStyledSlider(8, 160, 40, 160, 1.0);
+            _sliderCoreElemFontSize.Margin = new Thickness(10, 0, 0, 0);
             _sliderCoreElemFontSize.ValueChanged += (s, e) =>
             {
                 if (_isUpdatingUi) return;
                 double val = Math.Round(_sliderCoreElemFontSize.Value);
                 var elem = GetSelectedCoreElement();
-                if (elem != null) { elem.FontSize = val; _txtCoreElemFontSize.Text = val.ToString(); ApplyPreviewLive(); }
+                if (elem != null)
+                {
+                    elem.FontSize = val;
+                    _isUpdatingUi = true;
+                    try { _txtCoreElemFontSize.Text = val.ToString(); } finally { _isUpdatingUi = false; }
+                    SchedulePreviewLive();
+                }
             };
             szRow.Children.Add(_sliderCoreElemFontSize);
             stack.Children.Add(szRow);
@@ -1410,7 +1425,7 @@ namespace DesktopClock
 
             var opRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
             opRow.Children.Add(new TextBlock { Text = "Opacity:", Width = 110, VerticalAlignment = VerticalAlignment.Center });
-            _sliderCoreElemOpacity = new Slider { Minimum = 0, Maximum = 100, Value = 100, Width = 160, VerticalAlignment = VerticalAlignment.Center };
+            _sliderCoreElemOpacity = CreateStyledSlider(0, 100, 100, 160, 1.0);
             _sliderCoreElemOpacity.ValueChanged += (s, e) =>
             {
                 if (_isUpdatingUi) return;
@@ -1419,7 +1434,7 @@ namespace DesktopClock
                 {
                     elem.Opacity = Math.Round(_sliderCoreElemOpacity.Value) / 100.0;
                     _lblCoreElemOpacity.Text = ((int)Math.Round(_sliderCoreElemOpacity.Value)) + "%";
-                    ApplyPreviewLive();
+                    SchedulePreviewLive();
                 }
             };
             opRow.Children.Add(_sliderCoreElemOpacity);
@@ -1516,7 +1531,8 @@ namespace DesktopClock
             };
             xRow.Children.Add(_btnCoreElemIncX);
 
-            _sliderCoreElemOffsetX = new Slider { Minimum = -120, Maximum = 120, Value = 0, Width = 120, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            _sliderCoreElemOffsetX = CreateStyledSlider(-120, 120, 0, 120, 0.5);
+            _sliderCoreElemOffsetX.Margin = new Thickness(8, 0, 0, 0);
             _sliderCoreElemOffsetX.ValueChanged += (s, e) =>
             {
                 if (_isUpdatingUi) return;
@@ -1525,9 +1541,10 @@ namespace DesktopClock
                 if (elem != null)
                 {
                     elem.OffsetX = val;
-                    _txtCoreElemOffsetX.Text = val.ToString("0.0", CultureInfo.InvariantCulture);
+                    _isUpdatingUi = true;
+                    try { _txtCoreElemOffsetX.Text = val.ToString("0.0", CultureInfo.InvariantCulture); } finally { _isUpdatingUi = false; }
                     UpdateCorePosReadout();
-                    ApplyPreviewLive();
+                    SchedulePreviewLive();
                 }
             };
             xRow.Children.Add(_sliderCoreElemOffsetX);
@@ -1584,7 +1601,8 @@ namespace DesktopClock
             };
             yRow.Children.Add(_btnCoreElemIncY);
 
-            _sliderCoreElemOffsetY = new Slider { Minimum = -80, Maximum = 80, Value = 0, Width = 120, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            _sliderCoreElemOffsetY = CreateStyledSlider(-80, 80, 0, 120, 0.5);
+            _sliderCoreElemOffsetY.Margin = new Thickness(8, 0, 0, 0);
             _sliderCoreElemOffsetY.ValueChanged += (s, e) =>
             {
                 if (_isUpdatingUi) return;
@@ -1593,9 +1611,10 @@ namespace DesktopClock
                 if (elem != null)
                 {
                     elem.OffsetY = val;
-                    _txtCoreElemOffsetY.Text = val.ToString("0.0", CultureInfo.InvariantCulture);
+                    _isUpdatingUi = true;
+                    try { _txtCoreElemOffsetY.Text = val.ToString("0.0", CultureInfo.InvariantCulture); } finally { _isUpdatingUi = false; }
                     UpdateCorePosReadout();
-                    ApplyPreviewLive();
+                    SchedulePreviewLive();
                 }
             };
             yRow.Children.Add(_sliderCoreElemOffsetY);
@@ -1763,7 +1782,7 @@ namespace DesktopClock
 
             var outThickRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(20, 0, 0, 6) };
             outThickRow.Children.Add(new TextBlock { Text = "Thickness:", Width = 95, VerticalAlignment = VerticalAlignment.Center });
-            _sliderCoreElemOutlineThick = new Slider { Minimum = 5, Maximum = 80, Value = 20, Width = 140, VerticalAlignment = VerticalAlignment.Center };
+            _sliderCoreElemOutlineThick = CreateStyledSlider(5, 80, 20, 140, 1.0);
             _sliderCoreElemOutlineThick.ValueChanged += (s, e) =>
             {
                 if (_isUpdatingUi) return;
@@ -1773,7 +1792,7 @@ namespace DesktopClock
                 {
                     elem.Effects.OutlineThickness = val;
                     _lblCoreElemOutlineThick.Text = val.ToString("F1") + " DIP";
-                    ApplyPreviewLive();
+                    SchedulePreviewLive();
                 }
             };
             outThickRow.Children.Add(_sliderCoreElemOutlineThick);
@@ -1783,7 +1802,7 @@ namespace DesktopClock
 
             var outOpRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(20, 0, 0, 10) };
             outOpRow.Children.Add(new TextBlock { Text = "Opacity:", Width = 95, VerticalAlignment = VerticalAlignment.Center });
-            _sliderCoreElemOutlineOpacity = new Slider { Minimum = 0, Maximum = 100, Value = 100, Width = 140, VerticalAlignment = VerticalAlignment.Center };
+            _sliderCoreElemOutlineOpacity = CreateStyledSlider(0, 100, 100, 140, 1.0);
             _sliderCoreElemOutlineOpacity.ValueChanged += (s, e) =>
             {
                 if (_isUpdatingUi) return;
@@ -1793,7 +1812,7 @@ namespace DesktopClock
                 {
                     elem.Effects.OutlineOpacity = val;
                     _lblCoreElemOutlineOpacity.Text = ((int)Math.Round(_sliderCoreElemOutlineOpacity.Value)) + "%";
-                    ApplyPreviewLive();
+                    SchedulePreviewLive();
                 }
             };
             outOpRow.Children.Add(_sliderCoreElemOutlineOpacity);
@@ -1813,7 +1832,7 @@ namespace DesktopClock
 
             var gIntRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(20, 0, 0, 6) };
             gIntRow.Children.Add(new TextBlock { Text = "Intensity:", Width = 95, VerticalAlignment = VerticalAlignment.Center });
-            _sliderCoreElemGlitchInt = new Slider { Minimum = 0, Maximum = 100, Value = 35, Width = 140, VerticalAlignment = VerticalAlignment.Center };
+            _sliderCoreElemGlitchInt = CreateStyledSlider(0, 100, 35, 140, 1.0);
             _sliderCoreElemGlitchInt.ValueChanged += (s, e) =>
             {
                 if (_isUpdatingUi) return;
@@ -1822,7 +1841,7 @@ namespace DesktopClock
                 {
                     elem.Effects.GlitchIntensity = Math.Round(_sliderCoreElemGlitchInt.Value);
                     _lblCoreElemGlitchInt.Text = elem.Effects.GlitchIntensity + "%";
-                    ApplyPreviewLive();
+                    SchedulePreviewLive();
                 }
             };
             gIntRow.Children.Add(_sliderCoreElemGlitchInt);
@@ -1907,7 +1926,7 @@ namespace DesktopClock
 
             var nAmtRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(20, 0, 0, 6) };
             nAmtRow.Children.Add(new TextBlock { Text = "Amount:", Width = 95, VerticalAlignment = VerticalAlignment.Center });
-            _sliderCoreElemNoiseAmt = new Slider { Minimum = 0, Maximum = 100, Value = 25, Width = 140, VerticalAlignment = VerticalAlignment.Center };
+            _sliderCoreElemNoiseAmt = CreateStyledSlider(0, 100, 25, 140, 1.0);
             _sliderCoreElemNoiseAmt.ValueChanged += (s, e) =>
             {
                 if (_isUpdatingUi) return;
@@ -1916,7 +1935,7 @@ namespace DesktopClock
                 {
                     elem.Effects.NoiseAmount = Math.Round(_sliderCoreElemNoiseAmt.Value);
                     _lblCoreElemNoiseAmt.Text = elem.Effects.NoiseAmount + "%";
-                    ApplyPreviewLive();
+                    SchedulePreviewLive();
                 }
             };
             nAmtRow.Children.Add(_sliderCoreElemNoiseAmt);
@@ -2262,6 +2281,12 @@ namespace DesktopClock
                 return;
             }
 
+            // If user is focused on or inside a Slider, let the Slider handle its own arrow navigation
+            if (focused is Slider || IsDescendantOf(focused, typeof(Slider)))
+            {
+                return;
+            }
+
             bool isCoreTab = (_tabs != null && _tabs.SelectedIndex == 2);
             bool isBlockTab = (_tabs != null && _tabs.SelectedIndex == 3);
 
@@ -2545,6 +2570,7 @@ namespace DesktopClock
             row2.Children.Add(new TextBlock { Text = "Type:", Width = 60, VerticalAlignment = VerticalAlignment.Center });
             _cmbBlockType = CreateComboBox(120);
             _cmbBlockType.Items.Add("Symbol");
+            _cmbBlockType.Items.Add("Corner");
             _cmbBlockType.Items.Add("Static Text");
             _cmbBlockType.Items.Add("Rotating Text");
             _cmbBlockType.SelectionChanged += (s, e) =>
@@ -2554,6 +2580,12 @@ namespace DesktopClock
                 if (b != null)
                 {
                     b.Type = _cmbBlockType.SelectedItem.ToString();
+                    if (b.Type == "Corner" && string.IsNullOrEmpty(b.CornerShape))
+                    {
+                        b.CornerShape = CornerShapeTypes.CornerTopLeft;
+                        b.SymbolContent = "\u250C";
+                        if (_cmbBlockCornerShape != null) _cmbBlockCornerShape.SelectedIndex = 0;
+                    }
                     UpdateBlockTypeVisibility();
                     RefreshBlocksList();
                     ApplyPreviewLive();
@@ -2617,6 +2649,55 @@ namespace DesktopClock
             symRow.Children.Add(_txtBlockCustomSymbol);
             _panelBlockSymbol.Children.Add(symRow);
             insStack.Children.Add(_panelBlockSymbol);
+
+            // Block Content: Corner Shape
+            _panelBlockCorner = new StackPanel { Margin = new Thickness(0, 0, 0, 8) };
+            var cRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
+            cRow.Children.Add(new TextBlock { Text = "Corner:", Width = 60, VerticalAlignment = VerticalAlignment.Center });
+            _cmbBlockCornerShape = CreateComboBox(170);
+            _cmbBlockCornerShape.Items.Add("Top-Left (\u250C)");
+            _cmbBlockCornerShape.Items.Add("Top-Right (\u2510)");
+            _cmbBlockCornerShape.Items.Add("Bottom-Left (\u2514)");
+            _cmbBlockCornerShape.Items.Add("Bottom-Right (\u2518)");
+            _cmbBlockCornerShape.SelectionChanged += (s, e) =>
+            {
+                if (_isUpdatingUi || _cmbBlockCornerShape.SelectedItem == null) return;
+                var b = GetSelectedBlock();
+                if (b != null)
+                {
+                    switch (_cmbBlockCornerShape.SelectedIndex)
+                    {
+                        case 0: b.CornerShape = CornerShapeTypes.CornerTopLeft; b.SymbolContent = "\u250C"; break;
+                        case 1: b.CornerShape = CornerShapeTypes.CornerTopRight; b.SymbolContent = "\u2510"; break;
+                        case 2: b.CornerShape = CornerShapeTypes.CornerBottomLeft; b.SymbolContent = "\u2514"; break;
+                        case 3: b.CornerShape = CornerShapeTypes.CornerBottomRight; b.SymbolContent = "\u2518"; break;
+                    }
+                    RefreshBlocksList();
+                    ApplyPreviewLive();
+                }
+            };
+            cRow.Children.Add(_cmbBlockCornerShape);
+            _panelBlockCorner.Children.Add(cRow);
+
+            var cBtnRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(60, 0, 0, 0) };
+            _btnCornerTopLeft = CreateStyledButton("\u250C Top-Left", 85);
+            _btnCornerTopLeft.Click += (s, e) => { _cmbBlockCornerShape.SelectedIndex = 0; };
+            cBtnRow.Children.Add(_btnCornerTopLeft);
+
+            _btnCornerTopRight = CreateStyledButton("\u2510 Top-Right", 85);
+            _btnCornerTopRight.Click += (s, e) => { _cmbBlockCornerShape.SelectedIndex = 1; };
+            cBtnRow.Children.Add(_btnCornerTopRight);
+
+            _btnCornerBottomLeft = CreateStyledButton("\u2514 Bottom-Left", 95);
+            _btnCornerBottomLeft.Click += (s, e) => { _cmbBlockCornerShape.SelectedIndex = 2; };
+            cBtnRow.Children.Add(_btnCornerBottomLeft);
+
+            _btnCornerBottomRight = CreateStyledButton("\u2518 Bottom-Right", 95);
+            _btnCornerBottomRight.Click += (s, e) => { _cmbBlockCornerShape.SelectedIndex = 3; };
+            cBtnRow.Children.Add(_btnCornerBottomRight);
+
+            _panelBlockCorner.Children.Add(cBtnRow);
+            insStack.Children.Add(_panelBlockCorner);
 
             _panelBlockStatic = new StackPanel { Margin = new Thickness(0, 0, 0, 8) };
             var statRow = new StackPanel { Orientation = Orientation.Horizontal };
@@ -2857,13 +2938,20 @@ namespace DesktopClock
             };
             rowWz.Children.Add(_txtBlockFontSize);
 
-            _sliderBlockFontSize = new Slider { Minimum = 8, Maximum = 100, Value = 16, Width = 110, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            _sliderBlockFontSize = CreateStyledSlider(8, 100, 16, 110, 1.0);
+            _sliderBlockFontSize.Margin = new Thickness(8, 0, 0, 0);
             _sliderBlockFontSize.ValueChanged += (s, e) =>
             {
                 if (_isUpdatingUi) return;
                 double val = Math.Round(_sliderBlockFontSize.Value);
                 var b = GetSelectedBlock();
-                if (b != null) { b.FontSize = val; _txtBlockFontSize.Text = val.ToString(); ApplyPreviewLive(); }
+                if (b != null)
+                {
+                    b.FontSize = val;
+                    _isUpdatingUi = true;
+                    try { _txtBlockFontSize.Text = val.ToString(); } finally { _isUpdatingUi = false; }
+                    SchedulePreviewLive();
+                }
             };
             rowWz.Children.Add(_sliderBlockFontSize);
             appStack.Children.Add(rowWz);
@@ -2897,7 +2985,7 @@ namespace DesktopClock
 
             var rowOp = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
             rowOp.Children.Add(new TextBlock { Text = "Opacity:", Width = 70, VerticalAlignment = VerticalAlignment.Center });
-            _sliderBlockOpacity = new Slider { Minimum = 0, Maximum = 100, Value = 80, Width = 140, VerticalAlignment = VerticalAlignment.Center };
+            _sliderBlockOpacity = CreateStyledSlider(0, 100, 80, 140, 1.0);
             _sliderBlockOpacity.ValueChanged += (s, e) =>
             {
                 if (_isUpdatingUi) return;
@@ -2906,7 +2994,7 @@ namespace DesktopClock
                 {
                     b.Opacity = Math.Round(_sliderBlockOpacity.Value) / 100.0;
                     _lblBlockOpacity.Text = ((int)Math.Round(_sliderBlockOpacity.Value)) + "%";
-                    ApplyPreviewLive();
+                    SchedulePreviewLive();
                 }
             };
             rowOp.Children.Add(_sliderBlockOpacity);
@@ -2993,7 +3081,8 @@ namespace DesktopClock
             };
             rowBx.Children.Add(_btnBlockIncX);
 
-            _sliderBlockOffsetX = new Slider { Minimum = -120, Maximum = 120, Value = 0, Width = 90, Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            _sliderBlockOffsetX = CreateStyledSlider(-120, 120, 0, 90, 0.5);
+            _sliderBlockOffsetX.Margin = new Thickness(6, 0, 0, 0);
             _sliderBlockOffsetX.ValueChanged += (s, e) =>
             {
                 if (_isUpdatingUi) return;
@@ -3004,7 +3093,7 @@ namespace DesktopClock
                     b.OffsetX = val;
                     _txtBlockOffsetX.Text = val.ToString("0.0", CultureInfo.InvariantCulture);
                     UpdateBlockPosReadout();
-                    ApplyPreviewLive();
+                    SchedulePreviewLive();
                 }
             };
             rowBx.Children.Add(_sliderBlockOffsetX);
@@ -3060,7 +3149,8 @@ namespace DesktopClock
             };
             rowBy.Children.Add(_btnBlockIncY);
 
-            _sliderBlockOffsetY = new Slider { Minimum = -80, Maximum = 80, Value = 0, Width = 90, Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            _sliderBlockOffsetY = CreateStyledSlider(-80, 80, 0, 90, 0.5);
+            _sliderBlockOffsetY.Margin = new Thickness(6, 0, 0, 0);
             _sliderBlockOffsetY.ValueChanged += (s, e) =>
             {
                 if (_isUpdatingUi) return;
@@ -3071,7 +3161,7 @@ namespace DesktopClock
                     b.OffsetY = val;
                     _txtBlockOffsetY.Text = val.ToString("0.0", CultureInfo.InvariantCulture);
                     UpdateBlockPosReadout();
-                    ApplyPreviewLive();
+                    SchedulePreviewLive();
                 }
             };
             rowBy.Children.Add(_sliderBlockOffsetY);
@@ -3256,7 +3346,7 @@ namespace DesktopClock
             bOutRow.Children.Add(btnBOutCol);
 
             bOutRow.Children.Add(new TextBlock { Text = "Thick:", Width = 40, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
-            _sliderBlockOutlineThick = new Slider { Minimum = 5, Maximum = 60, Value = 20, Width = 80, VerticalAlignment = VerticalAlignment.Center };
+            _sliderBlockOutlineThick = CreateStyledSlider(5, 60, 20, 80, 1.0);
             _sliderBlockOutlineThick.ValueChanged += (s, e) =>
             {
                 if (_isUpdatingUi) return;
@@ -3266,13 +3356,33 @@ namespace DesktopClock
                 {
                     b.Effects.OutlineThickness = val;
                     _lblBlockOutlineThick.Text = val.ToString("F1");
-                    ApplyPreviewLive();
+                    SchedulePreviewLive();
                 }
             };
             bOutRow.Children.Add(_sliderBlockOutlineThick);
             _lblBlockOutlineThick = new TextBlock { Text = "2.0", Width = 30, Margin = new Thickness(4, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
             bOutRow.Children.Add(_lblBlockOutlineThick);
             blockFxStack.Children.Add(bOutRow);
+
+            var bOutOpRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(16, 0, 0, 6) };
+            bOutOpRow.Children.Add(new TextBlock { Text = "Opacity:", Width = 55, VerticalAlignment = VerticalAlignment.Center });
+            _sliderBlockOutlineOpacity = CreateStyledSlider(0, 100, 100, 100, 1.0);
+            _sliderBlockOutlineOpacity.ValueChanged += (s, e) =>
+            {
+                if (_isUpdatingUi) return;
+                double val = Math.Round(_sliderBlockOutlineOpacity.Value) / 100.0;
+                var b = GetSelectedBlock();
+                if (b != null && b.Effects != null)
+                {
+                    b.Effects.OutlineOpacity = val;
+                    _lblBlockOutlineOpacity.Text = ((int)Math.Round(_sliderBlockOutlineOpacity.Value)) + "%";
+                    SchedulePreviewLive();
+                }
+            };
+            bOutOpRow.Children.Add(_sliderBlockOutlineOpacity);
+            _lblBlockOutlineOpacity = new TextBlock { Text = "100%", Width = 40, Margin = new Thickness(4, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            bOutOpRow.Children.Add(_lblBlockOutlineOpacity);
+            blockFxStack.Children.Add(bOutOpRow);
 
             _chkBlockGlitch = new CheckBox { Content = "Glitch Effect", FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 2, 0, 4) };
             _chkBlockGlitch.Click += (s, e) =>
@@ -3285,7 +3395,7 @@ namespace DesktopClock
 
             var bGRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(16, 0, 0, 6) };
             bGRow.Children.Add(new TextBlock { Text = "Intensity:", Width = 60, VerticalAlignment = VerticalAlignment.Center });
-            _sliderBlockGlitchInt = new Slider { Minimum = 0, Maximum = 100, Value = 35, Width = 100, VerticalAlignment = VerticalAlignment.Center };
+            _sliderBlockGlitchInt = CreateStyledSlider(0, 100, 35, 100, 1.0);
             _sliderBlockGlitchInt.ValueChanged += (s, e) =>
             {
                 if (_isUpdatingUi) return;
@@ -3294,7 +3404,7 @@ namespace DesktopClock
                 {
                     b.Effects.GlitchIntensity = Math.Round(_sliderBlockGlitchInt.Value);
                     _lblBlockGlitchInt.Text = b.Effects.GlitchIntensity + "%";
-                    ApplyPreviewLive();
+                    SchedulePreviewLive();
                 }
             };
             bGRow.Children.Add(_sliderBlockGlitchInt);
@@ -3313,7 +3423,7 @@ namespace DesktopClock
 
             var bNRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(16, 0, 0, 6) };
             bNRow.Children.Add(new TextBlock { Text = "Amount:", Width = 60, VerticalAlignment = VerticalAlignment.Center });
-            _sliderBlockNoiseAmt = new Slider { Minimum = 0, Maximum = 100, Value = 25, Width = 100, VerticalAlignment = VerticalAlignment.Center };
+            _sliderBlockNoiseAmt = CreateStyledSlider(0, 100, 25, 100, 1.0);
             _sliderBlockNoiseAmt.ValueChanged += (s, e) =>
             {
                 if (_isUpdatingUi) return;
@@ -3322,7 +3432,7 @@ namespace DesktopClock
                 {
                     b.Effects.NoiseAmount = Math.Round(_sliderBlockNoiseAmt.Value);
                     _lblBlockNoiseAmt.Text = b.Effects.NoiseAmount + "%";
-                    ApplyPreviewLive();
+                    SchedulePreviewLive();
                 }
             };
             bNRow.Children.Add(_sliderBlockNoiseAmt);
@@ -3421,6 +3531,15 @@ namespace DesktopClock
                 _txtBlockCustomSymbol.Text = b.SymbolContent ?? "\u2726";
                 _txtBlockStaticText.Text = b.StaticContent ?? "";
 
+                if (_cmbBlockCornerShape != null)
+                {
+                    string cs = b.CornerShape ?? CornerShapeTypes.CornerTopLeft;
+                    if (cs == CornerShapeTypes.CornerTopRight) _cmbBlockCornerShape.SelectedIndex = 1;
+                    else if (cs == CornerShapeTypes.CornerBottomLeft) _cmbBlockCornerShape.SelectedIndex = 2;
+                    else if (cs == CornerShapeTypes.CornerBottomRight) _cmbBlockCornerShape.SelectedIndex = 3;
+                    else _cmbBlockCornerShape.SelectedIndex = 0;
+                }
+
                 _cmbBlockRotationMode.SelectedItem = b.RotationMode ?? "Sequential";
                 _txtBlockIntervalValue.Text = b.IntervalValue > 0 ? b.IntervalValue.ToString() : "30";
                 _cmbBlockIntervalUnit.SelectedItem = b.IntervalUnit ?? "Minutes";
@@ -3455,6 +3574,13 @@ namespace DesktopClock
                 _rectBlockOutlineSwatch.Fill = new SolidColorBrush(ParseColor(fx.OutlineColor));
                 _sliderBlockOutlineThick.Value = fx.OutlineThickness * 10.0;
                 _lblBlockOutlineThick.Text = fx.OutlineThickness.ToString("F1");
+
+                if (_sliderBlockOutlineOpacity != null)
+                {
+                    _sliderBlockOutlineOpacity.Value = Math.Round(fx.OutlineOpacity * 100.0);
+                    if (_lblBlockOutlineOpacity != null)
+                        _lblBlockOutlineOpacity.Text = ((int)Math.Round(_sliderBlockOutlineOpacity.Value)) + "%";
+                }
 
                 _chkBlockGlitch.IsChecked = fx.GlitchEnabled;
                 _sliderBlockGlitchInt.Value = fx.GlitchIntensity;
@@ -3526,6 +3652,7 @@ namespace DesktopClock
 
             string t = b.Type != null ? b.Type.ToLowerInvariant() : "symbol";
             _panelBlockSymbol.Visibility = (t == "symbol") ? Visibility.Visible : Visibility.Collapsed;
+            _panelBlockCorner.Visibility = (t.Contains("corner")) ? Visibility.Visible : Visibility.Collapsed;
             _panelBlockStatic.Visibility = (t.Contains("static")) ? Visibility.Visible : Visibility.Collapsed;
             _panelBlockRotating.Visibility = (t.Contains("rotating")) ? Visibility.Visible : Visibility.Collapsed;
         }
@@ -4418,6 +4545,134 @@ namespace DesktopClock
             btn.ToolTip = tooltip;
             System.Windows.Automation.AutomationProperties.SetName(btn, tooltip);
             return btn;
+        }
+
+        private static bool IsDescendantOf(DependencyObject obj, Type targetType)
+        {
+            while (obj != null)
+            {
+                if (targetType.IsAssignableFrom(obj.GetType())) return true;
+                if (obj is Visual || obj is System.Windows.Media.Media3D.Visual3D)
+                    obj = VisualTreeHelper.GetParent(obj);
+                else if (obj is FrameworkElement)
+                    obj = ((FrameworkElement)obj).Parent;
+                else
+                    break;
+            }
+            return false;
+        }
+
+        private static Style _cachedSliderStyle;
+
+        private static Style GetOrCreateSliderStyle()
+        {
+            if (_cachedSliderStyle != null) return _cachedSliderStyle;
+            try
+            {
+                string xaml =
+                    "<Style TargetType=\"{x:Type Slider}\" xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">" +
+                    "  <Setter Property=\"Focusable\" Value=\"True\"/>" +
+                    "  <Setter Property=\"IsTabStop\" Value=\"True\"/>" +
+                    "  <Setter Property=\"Height\" Value=\"24\"/>" +
+                    "  <Setter Property=\"IsMoveToPointEnabled\" Value=\"True\"/>" +
+                    "  <Setter Property=\"Template\">" +
+                    "    <Setter.Value>" +
+                    "      <ControlTemplate TargetType=\"{x:Type Slider}\">" +
+                    "        <Border x:Name=\"TrackBorder\" Background=\"#14161B\" BorderBrush=\"#4B5563\" BorderThickness=\"1\" CornerRadius=\"4\" Height=\"20\" VerticalAlignment=\"Center\" Padding=\"2,0,2,0\">" +
+                    "          <Track x:Name=\"PART_Track\">" +
+                    "            <Track.DecreaseRepeatButton>" +
+                    "              <RepeatButton Command=\"{x:Static Slider.DecreaseLarge}\" Opacity=\"0\" Focusable=\"False\"/>" +
+                    "            </Track.DecreaseRepeatButton>" +
+                    "            <Track.Thumb>" +
+                    "              <Thumb Width=\"14\" Height=\"18\" Cursor=\"Hand\" Focusable=\"False\">" +
+                    "                <Thumb.Template>" +
+                    "                  <ControlTemplate TargetType=\"{x:Type Thumb}\">" +
+                    "                    <Border x:Name=\"ThumbVisual\" Background=\"#00F0FF\" BorderBrush=\"#FFFFFF\" BorderThickness=\"1\" CornerRadius=\"3\"/>" +
+                    "                    <ControlTemplate.Triggers>" +
+                    "                      <Trigger Property=\"IsMouseOver\" Value=\"True\">" +
+                    "                        <Setter TargetName=\"ThumbVisual\" Property=\"Background\" Value=\"#38BDF8\"/>" +
+                    "                      </Trigger>" +
+                    "                      <Trigger Property=\"IsDragging\" Value=\"True\">" +
+                    "                        <Setter TargetName=\"ThumbVisual\" Property=\"Background\" Value=\"#E0F2FE\"/>" +
+                    "                      </Trigger>" +
+                    "                    </ControlTemplate.Triggers>" +
+                    "                  </ControlTemplate>" +
+                    "                </Thumb.Template>" +
+                    "              </Thumb>" +
+                    "            </Track.Thumb>" +
+                    "            <Track.IncreaseRepeatButton>" +
+                    "              <RepeatButton Command=\"{x:Static Slider.IncreaseLarge}\" Opacity=\"0\" Focusable=\"False\"/>" +
+                    "            </Track.IncreaseRepeatButton>" +
+                    "          </Track>" +
+                    "        </Border>" +
+                    "        <ControlTemplate.Triggers>" +
+                    "          <Trigger Property=\"IsKeyboardFocusWithin\" Value=\"True\">" +
+                    "            <Setter TargetName=\"TrackBorder\" Property=\"BorderBrush\" Value=\"#00F0FF\"/>" +
+                    "            <Setter TargetName=\"TrackBorder\" Property=\"Background\" Value=\"#1E222A\"/>" +
+                    "          </Trigger>" +
+                    "        </ControlTemplate.Triggers>" +
+                    "      </ControlTemplate>" +
+                    "    </Setter.Value>" +
+                    "  </Setter>" +
+                    "</Style>";
+                _cachedSliderStyle = (Style)System.Windows.Markup.XamlReader.Parse(xaml);
+            }
+            catch { }
+            return _cachedSliderStyle;
+        }
+
+        private static Slider CreateStyledSlider(double min, double max, double val, double width, double baseStep)
+        {
+            var slider = new Slider
+            {
+                Minimum = min,
+                Maximum = max,
+                Value = val,
+                Width = width,
+                Height = 24,
+                Focusable = true,
+                IsTabStop = true,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            var style = GetOrCreateSliderStyle();
+            if (style != null) slider.Style = style;
+
+            slider.PreviewKeyDown += (s, e) =>
+            {
+                if (e.Key == Key.Left || e.Key == Key.Down || e.Key == Key.Right || e.Key == Key.Up)
+                {
+                    double step = baseStep;
+                    if ((Keyboard.Modifiers & ModifierKeys.Control) != 0)
+                    {
+                        step = baseStep * 10.0;
+                    }
+                    else if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0)
+                    {
+                        step = baseStep * 5.0;
+                    }
+
+                    double cur = slider.Value;
+                    double nextVal;
+                    if (e.Key == Key.Left || e.Key == Key.Down)
+                    {
+                        nextVal = Math.Max(slider.Minimum, cur - step);
+                    }
+                    else
+                    {
+                        nextVal = Math.Min(slider.Maximum, cur + step);
+                    }
+                    slider.Value = nextVal;
+                    e.Handled = true;
+                }
+            };
+
+            slider.PreviewMouseDown += (s, e) =>
+            {
+                slider.Focus();
+            };
+
+            return slider;
         }
     }
 }

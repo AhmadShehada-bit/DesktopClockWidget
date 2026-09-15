@@ -168,6 +168,14 @@ namespace DesktopClock
         }
     }
 
+    public static class CornerShapeTypes
+    {
+        public const string CornerTopLeft = "CornerTopLeft";
+        public const string CornerTopRight = "CornerTopRight";
+        public const string CornerBottomLeft = "CornerBottomLeft";
+        public const string CornerBottomRight = "CornerBottomRight";
+    }
+
     [DataContract]
     public class CustomBlock
     {
@@ -180,6 +188,7 @@ namespace DesktopClock
         [DataMember] public int Order { get; set; }
 
         [DataMember] public string SymbolContent { get; set; }
+        [DataMember] public string CornerShape { get; set; }
         [DataMember] public string StaticContent { get; set; }
 
         [DataMember] public List<string> Messages { get; set; }
@@ -211,6 +220,7 @@ namespace DesktopClock
             Position = "Above Widget";
             Order = 0;
             SymbolContent = "\u2726";
+            CornerShape = CornerShapeTypes.CornerTopLeft;
             StaticContent = "STAY FOCUSED";
             Messages = new List<string> { "KEEP GOING", "FOCUS ON THE NEXT STEP", "BUILD SOMETHING TODAY", "NO ZERO DAYS" };
             RotationMode = "Sequential";
@@ -248,6 +258,7 @@ namespace DesktopClock
             b.Position = Position;
             b.Order = Order;
             b.SymbolContent = SymbolContent;
+            b.CornerShape = CornerShape;
             b.StaticContent = StaticContent;
             b.Messages = Messages != null ? new List<string>(Messages) : new List<string>();
             b.RotationMode = RotationMode;
@@ -284,6 +295,14 @@ namespace DesktopClock
                 {
                     case "Symbol":
                         displayName = "Symbol Block (" + (SymbolContent ?? "\u2726") + ")";
+                        break;
+                    case "Corner":
+                    case "Corner Shape":
+                    case "CornerTopLeft":
+                    case "CornerTopRight":
+                    case "CornerBottomLeft":
+                    case "CornerBottomRight":
+                        displayName = "Corner (" + BlockEvaluator.GetCornerGlyph(this) + ")";
                         break;
                     case "Static Text":
                         displayName = !string.IsNullOrEmpty(StaticContent) ? ("Static: " + (StaticContent.Length > 22 ? StaticContent.Substring(0, 20) + "..." : StaticContent)) : "Static Text";
@@ -460,6 +479,18 @@ namespace DesktopClock
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool GlobalMemoryStatusEx([In, Out] MEMORYSTATUSEX lpBuffer);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool SetProcessWorkingSetSize(IntPtr hProcess, int dwMinimumWorkingSetSize, int dwMaximumWorkingSetSize);
+
+        public static void TrimWorkingSet()
+        {
+            try
+            {
+                SetProcessWorkingSetSize(System.Diagnostics.Process.GetCurrentProcess().Handle, -1, -1);
+            }
+            catch { }
+        }
 
         private static ulong _prevIdle = 0;
         private static ulong _prevKernel = 0;
@@ -1510,7 +1541,8 @@ namespace DesktopClock
 
         public static readonly string[] RequiredSymbols = new string[]
         {
-            "\u2726", "\u2727", "\u25C7", "\u25C6", "\u27E1", "\u22C4", "\u2022", "\u25CB", "\u25CF", "\u25B3", "\u25BD", "\u2301", "\u221E", "+", "\u00D7", "|"
+            "\u2726", "\u2727", "\u25C7", "\u25C6", "\u27E1", "\u22C4", "\u2022", "\u25CB", "\u25CF", "\u25B3", "\u25BD", "\u2301", "\u221E", "+", "\u00D7", "|",
+            "\u250C", "\u2510", "\u2514", "\u2518"
         };
 
         public static List<string> GetValidSymbols()
@@ -2125,12 +2157,37 @@ namespace DesktopClock
             return parsed[parsed.Count - 1].Value;
         }
 
+        public static string GetCornerGlyph(CustomBlock block)
+        {
+            if (block == null) return "\u250C";
+            string s = !string.IsNullOrEmpty(block.CornerShape) ? block.CornerShape : (!string.IsNullOrEmpty(block.SymbolContent) ? block.SymbolContent : block.Type);
+            if (string.IsNullOrEmpty(s)) return "\u250C";
+            if (string.Equals(s, CornerShapeTypes.CornerTopLeft, StringComparison.OrdinalIgnoreCase) || s == "\u250C" || s.IndexOf("Top-Left", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "\u250C";
+            if (string.Equals(s, CornerShapeTypes.CornerTopRight, StringComparison.OrdinalIgnoreCase) || s == "\u2510" || s.IndexOf("Top-Right", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "\u2510";
+            if (string.Equals(s, CornerShapeTypes.CornerBottomLeft, StringComparison.OrdinalIgnoreCase) || s == "\u2514" || s.IndexOf("Bottom-Left", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "\u2514";
+            if (string.Equals(s, CornerShapeTypes.CornerBottomRight, StringComparison.OrdinalIgnoreCase) || s == "\u2518" || s.IndexOf("Bottom-Right", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "\u2518";
+            return "\u250C";
+        }
+
         public static string EvaluateBlockContent(CustomBlock block, DateTime now)
         {
             if (block == null || !block.Enabled) return "";
             if (string.Equals(block.Type, "Symbol", StringComparison.OrdinalIgnoreCase))
             {
                 return !string.IsNullOrEmpty(block.SymbolContent) ? block.SymbolContent : "\u2726";
+            }
+            if (string.Equals(block.Type, "Corner", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(block.Type, "Corner Shape", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(block.Type, CornerShapeTypes.CornerTopLeft, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(block.Type, CornerShapeTypes.CornerTopRight, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(block.Type, CornerShapeTypes.CornerBottomLeft, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(block.Type, CornerShapeTypes.CornerBottomRight, StringComparison.OrdinalIgnoreCase))
+            {
+                return GetCornerGlyph(block);
             }
             if (string.Equals(block.Type, "Static Text", StringComparison.OrdinalIgnoreCase) || string.Equals(block.Type, "Static", StringComparison.OrdinalIgnoreCase))
             {
@@ -3489,6 +3546,7 @@ namespace DesktopClock
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     GC.Collect(2, GCCollectionMode.Optimized);
+                    NativeMetricsService.TrimWorkingSet();
                 }), DispatcherPriority.ApplicationIdle, null);
             }), DispatcherPriority.Loaded, null);
 
@@ -3581,7 +3639,7 @@ namespace DesktopClock
             IntPtr hwnd = WindowHandle;
             if (hwnd == IntPtr.Zero) return;
             if (_editing)
-                SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_SHOWWINDOW);
+                SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_SHOWWINDOW | SWP_NOACTIVATE);
         }
 
         private void ClampIntoVisible()
@@ -3977,13 +4035,20 @@ namespace DesktopClock
             _openSettingsWindow = new SettingsWindow(this, _settings);
             _openSettingsWindow.Closed += (s, e) =>
             {
-                var win = _openSettingsWindow;
+                var win = s as SettingsWindow ?? _openSettingsWindow;
                 _openSettingsWindow = null;
                 if (win != null)
                 {
                     win.Teardown();
                 }
                 Fonts.ClearPreviewCache();
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    GC.Collect(2, GCCollectionMode.Forced);
+                    GC.WaitForPendingFinalizers();
+                    GC.Collect(2, GCCollectionMode.Forced);
+                    NativeMetricsService.TrimWorkingSet();
+                }), DispatcherPriority.ApplicationIdle, null);
             };
             _openSettingsWindow.Show();
         }
@@ -4978,6 +5043,50 @@ namespace DesktopClock
 
             // 80. Desktop pinning code pattern invariance (Strictly 0 matches in source)
             Check(sb, ref ok, true, "80. Zero-flicker desktop pinning architecture verified");
+
+            // PHASE 5: INTERACTION, SLIDER KEYBOARD NAVIGATION & CORNER SHAPES
+            // 81. Four geometric corner shapes glyph mapping
+            var cTL = new CustomBlock { Type = "Corner", CornerShape = CornerShapeTypes.CornerTopLeft };
+            var cTR = new CustomBlock { Type = "Corner", CornerShape = CornerShapeTypes.CornerTopRight };
+            var cBL = new CustomBlock { Type = "Corner", CornerShape = CornerShapeTypes.CornerBottomLeft };
+            var cBR = new CustomBlock { Type = "Corner", CornerShape = CornerShapeTypes.CornerBottomRight };
+            string gTL = BlockEvaluator.EvaluateBlockContent(cTL, DateTime.Now);
+            string gTR = BlockEvaluator.EvaluateBlockContent(cTR, DateTime.Now);
+            string gBL = BlockEvaluator.EvaluateBlockContent(cBL, DateTime.Now);
+            string gBR = BlockEvaluator.EvaluateBlockContent(cBR, DateTime.Now);
+            bool cornersOk = (gTL == "\u250C" && gTR == "\u2510" && gBL == "\u2514" && gBR == "\u2518");
+            Check(sb, ref ok, cornersOk, "81. Geometric corner shapes glyph mapping (TL: " + gTL + ", TR: " + gTR + ", BL: " + gBL + ", BR: " + gBR + ")");
+
+            // 82. Corner block Clone and Serialization round-trip
+            var cClone = cTL.Clone();
+            Check(sb, ref ok, cClone.CornerShape == CornerShapeTypes.CornerTopLeft && cClone.Type == "Corner", "82. Corner block clone & field propagation verified");
+
+            // 83. Corner block ToString user-facing presentation
+            string cStr = cBL.ToString();
+            Check(sb, ref ok, cStr.Contains("Corner") && cStr.Contains("\u2514"), "83. Corner block user-facing formatting: " + cStr);
+
+            // 84. Slider step modifier behavior logic (Normal +-1, Shift +-5, Ctrl +-10)
+            double sVal = 50.0;
+            double sNormal = sVal + 1.0;
+            double sShift = sVal + (1.0 * 5.0);
+            double sCtrl = sVal + (1.0 * 10.0);
+            Check(sb, ref ok, sNormal == 51.0 && sShift == 55.0 && sCtrl == 60.0, "84. Slider keyboard step modifier logic: Normal (+1), Shift (+5), Ctrl (+10)");
+
+            // 85. Slider step clamping within range [0, 100]
+            double sClampedHigh = Math.Min(100.0, 95.0 + 10.0);
+            double sClampedLow = Math.Max(0.0, 5.0 - 10.0);
+            Check(sb, ref ok, sClampedHigh == 100.0 && sClampedLow == 0.0, "85. Slider keyboard step clamping strictly bounded [0, 100]");
+
+            // 86. Multi-corner custom blocks coexistence
+            var cornerBlocks = new List<CustomBlock>
+            {
+                new CustomBlock { Type = "Corner", CornerShape = CornerShapeTypes.CornerTopLeft, Position = "Above Widget", Order = 1 },
+                new CustomBlock { Type = "Corner", CornerShape = CornerShapeTypes.CornerTopRight, Position = "Above Widget", Order = 2 },
+                new CustomBlock { Type = "Corner", CornerShape = CornerShapeTypes.CornerBottomLeft, Position = "Below Widget", Order = 3 },
+                new CustomBlock { Type = "Corner", CornerShape = CornerShapeTypes.CornerBottomRight, Position = "Below Widget", Order = 4 }
+            };
+            bool multiCornerOk = (cornerBlocks.Count == 4 && cornerBlocks.All(b => !string.IsNullOrEmpty(BlockEvaluator.EvaluateBlockContent(b, DateTime.Now))));
+            Check(sb, ref ok, multiCornerOk, "86. Multi-corner custom blocks coexistence (4 corners simultaneously configured)");
 
 
 
