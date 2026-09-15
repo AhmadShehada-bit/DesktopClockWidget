@@ -247,14 +247,19 @@ namespace DesktopClock
             _preview = SettingsManager.Clone(currentSettings);
 
             Title = "Desktop Clock Settings";
-            Width = 660;
+            Width = 680;
             Height = 720;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
             Background = new SolidColorBrush(Color.FromRgb(32, 34, 37));
             Foreground = new SolidColorBrush(Color.FromRgb(220, 220, 220));
             ResizeMode = ResizeMode.CanResize;
-            MinWidth = 580;
-            MinHeight = 560;
+            MinWidth = 620;
+            MinHeight = 600;
+
+            var chkStyle = new Style(typeof(CheckBox));
+            chkStyle.Setters.Add(new Setter(CheckBox.ForegroundProperty, new SolidColorBrush(Color.FromRgb(241, 245, 249))));
+            chkStyle.Setters.Add(new Setter(CheckBox.VerticalContentAlignmentProperty, VerticalAlignment.Center));
+            Resources.Add(typeof(CheckBox), chkStyle);
 
             InitializeComponents();
             LoadValues();
@@ -272,6 +277,8 @@ namespace DesktopClock
                 BorderBrush = new SolidColorBrush(Color.FromRgb(50, 52, 58)),
                 Margin = new Thickness(10)
             };
+            var tabItemStyle = GetOrCreateTabItemStyle();
+            if (tabItemStyle != null) _tabs.ItemContainerStyle = tabItemStyle;
             var tabs = _tabs;
             _tabs.SelectionChanged += (s, e) => { UpdateElementHighlight(); };
 
@@ -361,11 +368,7 @@ namespace DesktopClock
 
         public void Teardown()
         {
-            if (_previewCoalesceTimer != null)
-            {
-                _previewCoalesceTimer.Stop();
-                _previewCoalesceTimer = null;
-            }
+            _previewScheduled = false;
 
             PreviewKeyDown -= SettingsWindow_PreviewKeyDown;
 
@@ -4447,22 +4450,26 @@ namespace DesktopClock
             }
         }
 
-        private DispatcherTimer _previewCoalesceTimer;
+        private bool _previewScheduled = false;
 
         private void SchedulePreviewLive()
         {
-            if (_previewCoalesceTimer == null)
+            if (_previewScheduled)
             {
-                _previewCoalesceTimer = new DispatcherTimer(DispatcherPriority.Render);
-                _previewCoalesceTimer.Interval = TimeSpan.FromMilliseconds(15);
-                _previewCoalesceTimer.Tick += (s, e) =>
-                {
-                    _previewCoalesceTimer.Stop();
-                    ApplyPreviewLive();
-                };
+                LivePreviewPerfTracker.RecordCoalescedSkip();
+                return;
             }
-            _previewCoalesceTimer.Stop();
-            _previewCoalesceTimer.Start();
+            _previewScheduled = true;
+            LivePreviewPerfTracker.RecordSchedule();
+
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                _previewScheduled = false;
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                ApplyPreviewLive();
+                sw.Stop();
+                LivePreviewPerfTracker.RecordApplyPreview(sw.Elapsed.TotalMilliseconds);
+            }), DispatcherPriority.Render);
         }
 
         private void ApplyPreviewLive()
@@ -4508,35 +4515,251 @@ namespace DesktopClock
             return tb;
         }
 
+        private static Style _cachedComboBoxStyle;
+        private static Style GetOrCreateComboBoxStyle()
+        {
+            if (_cachedComboBoxStyle != null) return _cachedComboBoxStyle;
+            try
+            {
+                string xaml =
+                    "<Style xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\"" +
+                    "       xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\"" +
+                    "       TargetType=\"ComboBox\">" +
+                    "  <Setter Property=\"Background\" Value=\"#1E222A\"/>" +
+                    "  <Setter Property=\"Foreground\" Value=\"#F1F5F9\"/>" +
+                    "  <Setter Property=\"BorderBrush\" Value=\"#4B5563\"/>" +
+                    "  <Setter Property=\"BorderThickness\" Value=\"1\"/>" +
+                    "  <Setter Property=\"Height\" Value=\"26\"/>" +
+                    "  <Setter Property=\"SnapsToDevicePixels\" Value=\"True\"/>" +
+                    "  <Setter Property=\"ScrollViewer.HorizontalScrollBarVisibility\" Value=\"Disabled\"/>" +
+                    "  <Setter Property=\"ScrollViewer.VerticalScrollBarVisibility\" Value=\"Auto\"/>" +
+                    "  <Setter Property=\"Template\">" +
+                    "    <Setter.Value>" +
+                    "      <ControlTemplate TargetType=\"ComboBox\">" +
+                    "        <Grid>" +
+                    "          <ToggleButton x:Name=\"ToggleButton\"" +
+                    "                        Focusable=\"False\"" +
+                    "                        IsChecked=\"{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}\"" +
+                    "                        ClickMode=\"Press\">" +
+                    "            <ToggleButton.Template>" +
+                    "              <ControlTemplate TargetType=\"ToggleButton\">" +
+                    "                <Border x:Name=\"Border\" Background=\"#1E222A\" BorderBrush=\"#4B5563\" BorderThickness=\"1\" CornerRadius=\"3\">" +
+                    "                  <Grid>" +
+                    "                    <Grid.ColumnDefinitions>" +
+                    "                      <ColumnDefinition/>" +
+                    "                      <ColumnDefinition Width=\"20\"/>" +
+                    "                    </Grid.ColumnDefinitions>" +
+                    "                    <Path x:Name=\"Arrow\" Grid.Column=\"1\" Fill=\"#94A3B8\" HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\" Data=\"M 0 0 L 4 4 L 8 0 Z\"/>" +
+                    "                  </Grid>" +
+                    "                </Border>" +
+                    "                <ControlTemplate.Triggers>" +
+                    "                  <Trigger Property=\"IsMouseOver\" Value=\"True\">" +
+                    "                    <Setter TargetName=\"Border\" Property=\"BorderBrush\" Value=\"#00F0FF\"/>" +
+                    "                    <Setter TargetName=\"Arrow\" Property=\"Fill\" Value=\"#00F0FF\"/>" +
+                    "                  </Trigger>" +
+                    "                  <Trigger Property=\"IsChecked\" Value=\"True\">" +
+                    "                    <Setter TargetName=\"Border\" Property=\"BorderBrush\" Value=\"#00F0FF\"/>" +
+                    "                  </Trigger>" +
+                    "                  <Trigger Property=\"IsEnabled\" Value=\"False\">" +
+                    "                    <Setter TargetName=\"Border\" Property=\"Background\" Value=\"#16181D\"/>" +
+                    "                    <Setter TargetName=\"Border\" Property=\"BorderBrush\" Value=\"#2D323C\"/>" +
+                    "                    <Setter TargetName=\"Arrow\" Property=\"Fill\" Value=\"#475569\"/>" +
+                    "                  </Trigger>" +
+                    "                </ControlTemplate.Triggers>" +
+                    "              </ControlTemplate>" +
+                    "            </ToggleButton.Template>" +
+                    "          </ToggleButton>" +
+                    "          <ContentPresenter x:Name=\"ContentSite\"" +
+                    "                            IsHitTestVisible=\"False\"" +
+                    "                            Content=\"{TemplateBinding SelectionBoxItem}\"" +
+                    "                            ContentTemplate=\"{TemplateBinding SelectionBoxItemTemplate}\"" +
+                    "                            ContentTemplateSelector=\"{TemplateBinding ItemTemplateSelector}\"" +
+                    "                            Margin=\"8,3,22,3\"" +
+                    "                            VerticalAlignment=\"Center\"" +
+                    "                            HorizontalAlignment=\"Left\"/>" +
+                    "          <Popup x:Name=\"Popup\"" +
+                    "                 Placement=\"Bottom\"" +
+                    "                 IsOpen=\"{TemplateBinding IsDropDownOpen}\"" +
+                    "                 AllowsTransparency=\"True\"" +
+                    "                 Focusable=\"False\"" +
+                    "                 PopupAnimation=\"Slide\">" +
+                    "            <Grid x:Name=\"DropDown\"" +
+                    "                  SnapsToDevicePixels=\"True\"" +
+                    "                  MinWidth=\"{TemplateBinding ActualWidth}\"" +
+                    "                  MaxHeight=\"{TemplateBinding MaxDropDownHeight}\">" +
+                    "              <Border x:Name=\"DropDownBorder\" Background=\"#1E222A\" BorderThickness=\"1\" BorderBrush=\"#4B5563\" CornerRadius=\"2\">" +
+                    "                <ScrollViewer Margin=\"2\" SnapsToDevicePixels=\"True\">" +
+                    "                  <StackPanel IsItemsHost=\"True\" KeyboardNavigation.DirectionalNavigation=\"Contained\" />" +
+                    "                </ScrollViewer>" +
+                    "              </Border>" +
+                    "            </Grid>" +
+                    "          </Popup>" +
+                    "        </Grid>" +
+                    "        <ControlTemplate.Triggers>" +
+                    "          <Trigger Property=\"HasItems\" Value=\"False\">" +
+                    "            <Setter TargetName=\"DropDownBorder\" Property=\"MinHeight\" Value=\"30\"/>" +
+                    "          </Trigger>" +
+                    "          <Trigger Property=\"IsEnabled\" Value=\"False\">" +
+                    "            <Setter Property=\"Foreground\" Value=\"#64748B\"/>" +
+                    "          </Trigger>" +
+                    "        </ControlTemplate.Triggers>" +
+                    "      </ControlTemplate>" +
+                    "    </Setter.Value>" +
+                    "  </Setter>" +
+                    "  <Setter Property=\"ItemContainerStyle\">" +
+                    "    <Setter.Value>" +
+                    "      <Style TargetType=\"ComboBoxItem\">" +
+                    "        <Setter Property=\"Background\" Value=\"#1E222A\"/>" +
+                    "        <Setter Property=\"Foreground\" Value=\"#F1F5F9\"/>" +
+                    "        <Setter Property=\"Padding\" Value=\"6,4\"/>" +
+                    "        <Setter Property=\"Cursor\" Value=\"Hand\"/>" +
+                    "        <Setter Property=\"Template\">" +
+                    "          <Setter.Value>" +
+                    "            <ControlTemplate TargetType=\"ComboBoxItem\">" +
+                    "              <Border x:Name=\"Border\" Background=\"{TemplateBinding Background}\" Padding=\"{TemplateBinding Padding}\">" +
+                    "                <ContentPresenter />" +
+                    "              </Border>" +
+                    "              <ControlTemplate.Triggers>" +
+                    "                <Trigger Property=\"IsHighlighted\" Value=\"True\">" +
+                    "                  <Setter TargetName=\"Border\" Property=\"Background\" Value=\"#2D323C\"/>" +
+                    "                  <Setter Property=\"Foreground\" Value=\"#00F0FF\"/>" +
+                    "                </Trigger>" +
+                    "                <Trigger Property=\"IsSelected\" Value=\"True\">" +
+                    "                  <Setter TargetName=\"Border\" Property=\"Background\" Value=\"#253545\"/>" +
+                    "                  <Setter Property=\"Foreground\" Value=\"#00F0FF\"/>" +
+                    "                </Trigger>" +
+                    "              </ControlTemplate.Triggers>" +
+                    "            </ControlTemplate>" +
+                    "          </Setter.Value>" +
+                    "        </Setter>" +
+                    "      </Style>" +
+                    "    </Setter.Value>" +
+                    "  </Setter>" +
+                    "</Style>";
+                _cachedComboBoxStyle = (Style)System.Windows.Markup.XamlReader.Parse(xaml);
+            }
+            catch { }
+            return _cachedComboBoxStyle;
+        }
+
+        private static Style _cachedButtonStyle;
+        private static Style GetOrCreateButtonStyle()
+        {
+            if (_cachedButtonStyle != null) return _cachedButtonStyle;
+            try
+            {
+                string xaml =
+                    "<Style xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\"" +
+                    "       xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\"" +
+                    "       TargetType=\"Button\">" +
+                    "  <Setter Property=\"Background\" Value=\"#282C34\"/>" +
+                    "  <Setter Property=\"Foreground\" Value=\"#F1F5F9\"/>" +
+                    "  <Setter Property=\"BorderBrush\" Value=\"#4B5563\"/>" +
+                    "  <Setter Property=\"BorderThickness\" Value=\"1\"/>" +
+                    "  <Setter Property=\"Padding\" Value=\"6,3\"/>" +
+                    "  <Setter Property=\"FontSize\" Value=\"12\"/>" +
+                    "  <Setter Property=\"Cursor\" Value=\"Hand\"/>" +
+                    "  <Setter Property=\"Template\">" +
+                    "    <Setter.Value>" +
+                    "      <ControlTemplate TargetType=\"Button\">" +
+                    "        <Border x:Name=\"border\" Background=\"{TemplateBinding Background}\" BorderBrush=\"{TemplateBinding BorderBrush}\" BorderThickness=\"{TemplateBinding BorderThickness}\" CornerRadius=\"3\" SnapsToDevicePixels=\"True\">" +
+                    "          <ContentPresenter HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\" Margin=\"{TemplateBinding Padding}\"/>" +
+                    "        </Border>" +
+                    "        <ControlTemplate.Triggers>" +
+                    "          <Trigger Property=\"IsMouseOver\" Value=\"True\">" +
+                    "            <Setter TargetName=\"border\" Property=\"Background\" Value=\"#353B45\"/>" +
+                    "            <Setter TargetName=\"border\" Property=\"BorderBrush\" Value=\"#00F0FF\"/>" +
+                    "          </Trigger>" +
+                    "          <Trigger Property=\"IsPressed\" Value=\"True\">" +
+                    "            <Setter TargetName=\"border\" Property=\"Background\" Value=\"#20242B\"/>" +
+                    "          </Trigger>" +
+                    "          <Trigger Property=\"IsEnabled\" Value=\"False\">" +
+                    "            <Setter TargetName=\"border\" Property=\"Background\" Value=\"#1A1D23\"/>" +
+                    "            <Setter TargetName=\"border\" Property=\"BorderBrush\" Value=\"#2D323C\"/>" +
+                    "            <Setter Property=\"Foreground\" Value=\"#64748B\"/>" +
+                    "          </Trigger>" +
+                    "        </ControlTemplate.Triggers>" +
+                    "      </ControlTemplate>" +
+                    "    </Setter.Value>" +
+                    "  </Setter>" +
+                    "</Style>";
+                _cachedButtonStyle = (Style)System.Windows.Markup.XamlReader.Parse(xaml);
+            }
+            catch { }
+            return _cachedButtonStyle;
+        }
+
+        private static Style _cachedTabItemStyle;
+        private static Style GetOrCreateTabItemStyle()
+        {
+            if (_cachedTabItemStyle != null) return _cachedTabItemStyle;
+            try
+            {
+                string xaml =
+                    "<Style xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\"" +
+                    "       xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\"" +
+                    "       TargetType=\"TabItem\">" +
+                    "  <Setter Property=\"Background\" Value=\"#1A1D23\"/>" +
+                    "  <Setter Property=\"Foreground\" Value=\"#94A3B8\"/>" +
+                    "  <Setter Property=\"BorderBrush\" Value=\"#323640\"/>" +
+                    "  <Setter Property=\"BorderThickness\" Value=\"1,1,1,0\"/>" +
+                    "  <Setter Property=\"Margin\" Value=\"0,0,2,0\"/>" +
+                    "  <Setter Property=\"Padding\" Value=\"10,6\"/>" +
+                    "  <Setter Property=\"Cursor\" Value=\"Hand\"/>" +
+                    "  <Setter Property=\"Template\">" +
+                    "    <Setter.Value>" +
+                    "      <ControlTemplate TargetType=\"TabItem\">" +
+                    "        <Border x:Name=\"tabBorder\" Background=\"{TemplateBinding Background}\" BorderBrush=\"{TemplateBinding BorderBrush}\" BorderThickness=\"{TemplateBinding BorderThickness}\" CornerRadius=\"3,3,0,0\" Padding=\"{TemplateBinding Padding}\">" +
+                    "          <Grid>" +
+                    "            <ContentPresenter ContentSource=\"Header\" HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\"/>" +
+                    "          </Grid>" +
+                    "        </Border>" +
+                    "        <ControlTemplate.Triggers>" +
+                    "          <Trigger Property=\"IsMouseOver\" Value=\"True\">" +
+                    "            <Setter TargetName=\"tabBorder\" Property=\"Background\" Value=\"#262A32\"/>" +
+                    "            <Setter Property=\"Foreground\" Value=\"#E2E8F0\"/>" +
+                    "          </Trigger>" +
+                    "          <Trigger Property=\"IsSelected\" Value=\"True\">" +
+                    "            <Setter TargetName=\"tabBorder\" Property=\"Background\" Value=\"#2B303A\"/>" +
+                    "            <Setter TargetName=\"tabBorder\" Property=\"BorderBrush\" Value=\"#00F0FF\"/>" +
+                    "            <Setter Property=\"Foreground\" Value=\"#00F0FF\"/>" +
+                    "            <Setter Property=\"FontWeight\" Value=\"SemiBold\"/>" +
+                    "          </Trigger>" +
+                    "        </ControlTemplate.Triggers>" +
+                    "      </ControlTemplate>" +
+                    "    </Setter.Value>" +
+                    "  </Setter>" +
+                    "</Style>";
+                _cachedTabItemStyle = (Style)System.Windows.Markup.XamlReader.Parse(xaml);
+            }
+            catch { }
+            return _cachedTabItemStyle;
+        }
+
         private static ComboBox CreateComboBox(double width)
         {
             var cb = new ComboBox
             {
                 Width = width,
-                Background = new SolidColorBrush(Color.FromRgb(28, 30, 35)),
-                Foreground = new SolidColorBrush(Color.FromRgb(240, 240, 240)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(75, 85, 99)),
                 VerticalAlignment = VerticalAlignment.Center
             };
-            var itemStyle = new Style(typeof(ComboBoxItem));
-            itemStyle.Setters.Add(new Setter(ComboBoxItem.ForegroundProperty, new SolidColorBrush(Color.FromRgb(240, 240, 240))));
-            itemStyle.Setters.Add(new Setter(ComboBoxItem.BackgroundProperty, new SolidColorBrush(Color.FromRgb(32, 34, 40))));
-            cb.ItemContainerStyle = itemStyle;
+            var style = GetOrCreateComboBoxStyle();
+            if (style != null) cb.Style = style;
             return cb;
         }
 
         private static Button CreateStyledButton(string text, double width)
         {
-            return new Button
+            var btn = new Button
             {
                 Content = text,
                 Width = width,
                 Height = 26,
-                Background = new SolidColorBrush(Color.FromRgb(40, 44, 52)),
-                Foreground = new SolidColorBrush(Color.FromRgb(240, 240, 240)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(80, 90, 105)),
                 Margin = new Thickness(0, 0, 6, 0)
             };
+            var style = GetOrCreateButtonStyle();
+            if (style != null) btn.Style = style;
+            return btn;
         }
 
         private static Button CreateStyledButton(string text, double width, string tooltip)

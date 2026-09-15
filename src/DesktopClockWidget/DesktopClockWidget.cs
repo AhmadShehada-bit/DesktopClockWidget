@@ -485,11 +485,7 @@ namespace DesktopClock
 
         public static void TrimWorkingSet()
         {
-            try
-            {
-                SetProcessWorkingSetSize(System.Diagnostics.Process.GetCurrentProcess().Handle, -1, -1);
-            }
-            catch { }
+            // No-op: Forced working-set trimming causes page faults, cache eviction, and UI stutter during normal lifecycle.
         }
 
         private static ulong _prevIdle = 0;
@@ -2013,7 +2009,6 @@ namespace DesktopClock
                 }
                 _lruOrder.Clear();
             }
-            GC.Collect(1, GCCollectionMode.Optimized);
         }
 
         public static FontFamily For(string familyName)
@@ -2215,6 +2210,57 @@ namespace DesktopClock
         {
             Width = w;
             Height = h;
+        }
+    }
+
+    public static class LivePreviewPerfTracker
+    {
+        private static readonly List<double> _applyPreviewTimings = new List<double>();
+        private static int _scheduledCount = 0;
+        private static int _coalescedDropCount = 0;
+        private static double _maxLatencyMs = 0;
+
+        public static void RecordSchedule()
+        {
+            _scheduledCount++;
+        }
+
+        public static void RecordCoalescedSkip()
+        {
+            _coalescedDropCount++;
+        }
+
+        public static void RecordApplyPreview(double durationMs)
+        {
+            lock (_applyPreviewTimings)
+            {
+                _applyPreviewTimings.Add(durationMs);
+                if (durationMs > _maxLatencyMs) _maxLatencyMs = durationMs;
+            }
+
+            if (durationMs > 33.0)
+                ClockWindow.LogTrayDebug(string.Format("[PERF WARNING >33ms] ApplyPreview took {0:F2}ms", durationMs));
+            else if (durationMs > 16.0)
+                ClockWindow.LogTrayDebug(string.Format("[PERF WARNING >16ms] ApplyPreview took {0:F2}ms", durationMs));
+            else if (durationMs > 8.0)
+                ClockWindow.LogTrayDebug(string.Format("[PERF WARNING >8ms] ApplyPreview took {0:F2}ms", durationMs));
+            else if (durationMs > 4.0)
+                ClockWindow.LogTrayDebug(string.Format("[PERF NOTICE >4ms] ApplyPreview took {0:F2}ms", durationMs));
+        }
+
+        public static string GetSummary()
+        {
+            lock (_applyPreviewTimings)
+            {
+                if (_applyPreviewTimings.Count == 0) return "No ApplyPreview events recorded.";
+                var sorted = _applyPreviewTimings.OrderBy(t => t).ToList();
+                double avg = sorted.Average();
+                int p95Idx = (int)Math.Floor(sorted.Count * 0.95);
+                double p95 = sorted[Math.Min(p95Idx, sorted.Count - 1)];
+                double worst = sorted[sorted.Count - 1];
+                return string.Format("ApplyPreview stats (N={0}, coalesced skips={1}): Avg={2:F3}ms, P95={3:F3}ms, Worst={4:F3}ms",
+                    sorted.Count, _coalescedDropCount, avg, p95, worst);
+            }
         }
     }
 
@@ -3475,10 +3521,242 @@ namespace DesktopClock
 
         public void ApplyPreview(WidgetSettings preview)
         {
+            if (preview == null) return;
             bool wasEditing = _editing;
+            WidgetSettings old = _settings;
             _settings = preview;
-            ApplySettings();
+            double mo = _settings.MasterOpacity <= 0 ? 1.0 : _settings.MasterOpacity;
+
+            // 1. Core text elements updated in place
+            UpdateCoreElementInPlace(_greetingText, old != null ? old.Greeting : null, _settings.Greeting, _settings.UseGlobalColor, _settings.GlobalColor, _settings.UseGlobalFont, _settings.GlobalFont, mo, new Action(() =>
+            {
+                if (_greetingText != null && _settings.Greeting != null && _settings.Greeting.Visible)
+                    _greetingText.StableEnvelope = DynamicEnvelopeHelper.ComputeEnvelope(_greetingText.FontFamily, _greetingText.FontWeight, _greetingText.FontSize, _greetingText.Effects, _settings.Greeting.Case, DynamicEnvelopeHelper.GetGreetingCandidates(_settings));
+            }));
+
+            UpdateCoreElementInPlace(_weekdayText, old != null ? old.Weekday : null, _settings.Weekday, _settings.UseGlobalColor, _settings.GlobalColor, _settings.UseGlobalFont, _settings.GlobalFont, mo, new Action(() =>
+            {
+                if (_weekdayText != null && _settings.Weekday != null && _settings.Weekday.Visible)
+                    _weekdayText.StableEnvelope = DynamicEnvelopeHelper.ComputeEnvelope(_weekdayText.FontFamily, _weekdayText.FontWeight, _weekdayText.FontSize, _weekdayText.Effects, _settings.Weekday.Case, DynamicEnvelopeHelper.GetWeekdayCandidates());
+            }));
+
+            UpdateCoreElementInPlace(_timeText, old != null ? old.Time : null, _settings.Time, _settings.UseGlobalColor, _settings.GlobalColor, _settings.UseGlobalFont, _settings.GlobalFont, mo, new Action(() =>
+            {
+                if (_timeText != null && _settings.Time != null && _settings.Time.Visible)
+                    _timeText.StableEnvelope = DynamicEnvelopeHelper.ComputeEnvelope(_timeText.FontFamily, _timeText.FontWeight, _timeText.FontSize, _timeText.Effects, _settings.Time.Case, DynamicEnvelopeHelper.GetTimeCandidates(_settings));
+            }));
+
+            UpdateCoreElementInPlace(_dateText, old != null ? old.Date : null, _settings.Date, _settings.UseGlobalColor, _settings.GlobalColor, _settings.UseGlobalFont, _settings.GlobalFont, mo, new Action(() =>
+            {
+                if (_dateText != null && _settings.Date != null && _settings.Date.Visible)
+                    _dateText.StableEnvelope = DynamicEnvelopeHelper.ComputeEnvelope(_dateText.FontFamily, _dateText.FontWeight, _dateText.FontSize, _dateText.Effects, _settings.Date.Case, DynamicEnvelopeHelper.GetDateCandidates(_settings));
+            }));
+
+            // 2. Custom Blocks: update in place if structural topology hasn't changed
+            if (CanUpdateCustomBlocksInPlace(old != null ? old.Blocks : null, _settings.Blocks))
+            {
+                UpdateCustomBlocksInPlace(mo);
+            }
+            else
+            {
+                ApplyCustomBlocks(mo);
+            }
+
+            // 3. Modules: update in place if structural configuration hasn't changed
+            if (CanUpdateModulesInPlace(old, _settings))
+            {
+                UpdateModulesInPlace(mo);
+            }
+            else
+            {
+                ApplyModules(mo);
+            }
+
+            // 4. Update texts & scale
+            ApplyGreeting();
+            UpdateDateTime();
+            if (old == null || Math.Abs(old.Scale - _settings.Scale) > 0.0001)
+            {
+                ApplyScale(_settings.Scale);
+            }
+
+            // 5. Update animation timers if changed
+            UpdateAnimationTimerState();
+
+            // 6. ClickThrough: ONLY call Win32 SetWindowLong/UpdateZ if clickthrough actually changed
+            if (old != null && old.ClickThrough != _settings.ClickThrough)
+            {
+                if (!_editing)
+                    ApplyClickThrough(_settings.ClickThrough);
+                else
+                    ApplyClickThrough(false);
+            }
+
+            // 7. Reposition window: ONLY call Win32 SetWindowPos if coordinates or anchor changed
+            if (old != null && (old.Left != _settings.Left || old.Top != _settings.Top || old.AnchorX != _settings.AnchorX || old.AnchorY != _settings.AnchorY))
+            {
+                PositionWindowAroundAnchor();
+            }
+
             _editing = wasEditing;
+        }
+
+        private void UpdateCoreElementInPlace(EffectTextBlock tb, ElementSettings oldElem, ElementSettings newElem, bool useGlobalColor, string globalColor, bool useGlobalFont, string globalFont, double masterOpacity, Action recomputeEnvelope)
+        {
+            if (tb == null || newElem == null) return;
+
+            var vis = newElem.Visible ? Visibility.Visible : Visibility.Collapsed;
+            if (tb.Visibility != vis) tb.Visibility = vis;
+
+            string fontName = (useGlobalFont && !string.IsNullOrEmpty(globalFont)) ? globalFont : newElem.FontFamily;
+            bool fontMetricChanged = false;
+            if (oldElem == null)
+            {
+                fontMetricChanged = true;
+            }
+            else
+            {
+                string oldFontName = (useGlobalFont && !string.IsNullOrEmpty(globalFont)) ? globalFont : oldElem.FontFamily;
+                if (!string.Equals(oldFontName, fontName, StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(oldElem.FontWeight, newElem.FontWeight, StringComparison.OrdinalIgnoreCase) ||
+                    Math.Abs(oldElem.FontSize - newElem.FontSize) > 0.01 ||
+                    !string.Equals(oldElem.Case, newElem.Case, StringComparison.OrdinalIgnoreCase))
+                {
+                    fontMetricChanged = true;
+                }
+                if (oldElem.Effects != null && newElem.Effects != null)
+                {
+                    if (oldElem.Effects.OutlineEnabled != newElem.Effects.OutlineEnabled ||
+                        Math.Abs(oldElem.Effects.OutlineThickness - newElem.Effects.OutlineThickness) > 0.01)
+                    {
+                        fontMetricChanged = true;
+                    }
+                }
+                else if ((oldElem.Effects == null) != (newElem.Effects == null))
+                {
+                    fontMetricChanged = true;
+                }
+            }
+
+            if (fontMetricChanged)
+            {
+                tb.FontFamily = Fonts.For(fontName);
+                tb.FontWeight = Fonts.ParseWeight(newElem.FontWeight);
+                tb.FontStyle = FontStyles.Normal;
+                tb.FontSize = Math.Max(6, newElem.FontSize);
+                if (recomputeEnvelope != null) recomputeEnvelope();
+            }
+
+            string hexColor = (useGlobalColor && !string.IsNullOrEmpty(globalColor)) ? globalColor : newElem.Color;
+            tb.TextColor = ParseColor(hexColor);
+            tb.TextOpacity = Math.Max(0.0, Math.Min(1.0, newElem.Opacity * masterOpacity));
+            tb.ElementAlignment = !string.IsNullOrEmpty(newElem.HorizontalAlignment) ? newElem.HorizontalAlignment : "Center";
+            tb.OffsetX = newElem.OffsetX;
+            tb.OffsetY = newElem.OffsetY;
+            tb.Effects = newElem.Effects != null ? newElem.Effects.Clone() : new TextEffectSettings();
+        }
+
+        private bool CanUpdateCustomBlocksInPlace(List<CustomBlock> oldBlocks, List<CustomBlock> newBlocks)
+        {
+            if (oldBlocks == null && newBlocks == null) return true;
+            if (oldBlocks == null || newBlocks == null) return false;
+            if (oldBlocks.Count != newBlocks.Count) return false;
+            for (int i = 0; i < oldBlocks.Count; i++)
+            {
+                var ob = oldBlocks[i];
+                var nb = newBlocks[i];
+                if (ob.Id != nb.Id ||
+                    ob.Position != nb.Position ||
+                    ob.Enabled != nb.Enabled ||
+                    ob.Order != nb.Order ||
+                    ob.Type != nb.Type)
+                {
+                    return false;
+                }
+                if (nb.Enabled && !_customBlockElements.ContainsKey(nb.Id))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private void UpdateCustomBlocksInPlace(double masterOpacity)
+        {
+            if (_settings.Blocks == null) return;
+            DateTime now = DateTime.Now;
+
+            foreach (var b in _settings.Blocks)
+            {
+                if (!b.Enabled) continue;
+                EffectTextBlock tb;
+                if (!_customBlockElements.TryGetValue(b.Id, out tb) || tb == null) continue;
+
+                string rawText = BlockEvaluator.EvaluateBlockContent(b, now);
+                string text = TextCaseHelper.ApplyCase(rawText, b.Case);
+                if (tb.Text != text) tb.Text = text;
+
+                string fontName = (_settings.UseGlobalFont && !string.IsNullOrEmpty(_settings.GlobalFont)) ? _settings.GlobalFont : b.FontFamily;
+                FontFamily fam = GlyphHelper.ResolveFontForText(Fonts.For(fontName), text);
+                if (tb.FontFamily != fam) tb.FontFamily = fam;
+
+                tb.FontWeight = Fonts.ParseWeight(b.FontWeight);
+                tb.FontStyle = b.Italic ? FontStyles.Italic : FontStyles.Normal;
+                tb.FontSize = Math.Max(6, b.FontSize);
+
+                string hexColor = (_settings.UseGlobalColor && !string.IsNullOrEmpty(_settings.GlobalColor)) ? _settings.GlobalColor : b.Color;
+                tb.TextColor = ParseColor(hexColor);
+                tb.TextOpacity = Math.Max(0.0, Math.Min(1.0, b.Opacity * masterOpacity));
+                tb.ElementAlignment = !string.IsNullOrEmpty(b.Alignment) ? b.Alignment : "Center";
+                tb.OffsetX = b.OffsetX;
+                tb.OffsetY = b.OffsetY;
+                tb.Effects = b.Effects != null ? b.Effects.Clone() : new TextEffectSettings();
+                tb.IsSelectedForEdit = string.Equals(_activeHighlightedElementKey, b.Id, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        private bool CanUpdateModulesInPlace(WidgetSettings old, WidgetSettings current)
+        {
+            if (old == null || current == null) return false;
+            bool oldWeatherEnabled = old.Weather != null && old.Weather.Enabled;
+            bool curWeatherEnabled = current.Weather != null && current.Weather.Enabled;
+            if (oldWeatherEnabled != curWeatherEnabled) return false;
+            if (curWeatherEnabled && (old.Weather.Position != current.Weather.Position)) return false;
+
+            bool oldMetricsEnabled = old.Metrics != null && old.Metrics.Enabled;
+            bool curMetricsEnabled = current.Metrics != null && current.Metrics.Enabled;
+            if (oldMetricsEnabled != curMetricsEnabled) return false;
+            if (curMetricsEnabled && (old.Metrics.Position != current.Metrics.Position)) return false;
+
+            int oldTzCount = (old.Timezones != null) ? old.Timezones.Count : 0;
+            int curTzCount = (current.Timezones != null) ? current.Timezones.Count : 0;
+            if (oldTzCount != curTzCount) return false;
+
+            return true;
+        }
+
+        private void UpdateModulesInPlace(double masterOpacity)
+        {
+            if (_weatherText != null && _settings.Weather != null && _settings.Weather.Enabled)
+            {
+                ApplyElementStyle(_weatherText, _settings.Weather.Appearance, _settings.UseGlobalColor, _settings.GlobalColor, _settings.UseGlobalFont, _settings.GlobalFont, masterOpacity);
+            }
+
+            if (_metricsText != null && _settings.Metrics != null && _settings.Metrics.Enabled)
+            {
+                ApplyElementStyle(_metricsText, _settings.Metrics.Appearance, _settings.UseGlobalColor, _settings.GlobalColor, _settings.UseGlobalFont, _settings.GlobalFont, masterOpacity);
+            }
+
+            if (_timezoneElements.Count > 0 && _settings.Timezones != null)
+            {
+                foreach (var tz in _settings.Timezones)
+                {
+                    if (tz != null && tz.Enabled && _timezoneElements.ContainsKey(tz.Id))
+                    {
+                        ApplyElementStyle(_timezoneElements[tz.Id], tz.Appearance, _settings.UseGlobalColor, _settings.GlobalColor, _settings.UseGlobalFont, _settings.GlobalFont, masterOpacity);
+                    }
+                }
+            }
         }
 
         public void CommitSettings(WidgetSettings settings)
@@ -3542,12 +3820,6 @@ namespace DesktopClock
                 ApplySettings();
                 UpdateDateTime();
                 Opacity = 1;
-
-                Dispatcher.BeginInvoke(new Action(() =>
-                {
-                    GC.Collect(2, GCCollectionMode.Optimized);
-                    NativeMetricsService.TrimWorkingSet();
-                }), DispatcherPriority.ApplicationIdle, null);
             }), DispatcherPriority.Loaded, null);
 
             _timeTimer = new DispatcherTimer(DispatcherPriority.Normal) { Interval = TimeSpan.FromSeconds(1) };
@@ -4042,13 +4314,6 @@ namespace DesktopClock
                     win.Teardown();
                 }
                 Fonts.ClearPreviewCache();
-                Dispatcher.BeginInvoke(new Action(() =>
-                {
-                    GC.Collect(2, GCCollectionMode.Forced);
-                    GC.WaitForPendingFinalizers();
-                    GC.Collect(2, GCCollectionMode.Forced);
-                    NativeMetricsService.TrimWorkingSet();
-                }), DispatcherPriority.ApplicationIdle, null);
             };
             _openSettingsWindow.Show();
         }
@@ -4202,6 +4467,10 @@ namespace DesktopClock
         private static System.Threading.Mutex _appMutex;
         private static ClockWindow _mainWindow;
 
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool AttachConsole(int dwProcessId);
+        private const int ATTACH_PARENT_PROCESS = -1;
+
         [STAThread]
         public static void Main()
         {
@@ -4213,8 +4482,8 @@ namespace DesktopClock
             string[] args = Environment.GetCommandLineArgs();
             for (int i = 1; i < args.Length; i++)
             {
-                if (args[i] == "--selftest") { RunSelfTest(); return; }
-                if (args[i] == "--dragtest") { RunDragTest(); return; }
+                if (args[i] == "--selftest") { AttachConsole(ATTACH_PARENT_PROCESS); RunSelfTest(); return; }
+                if (args[i] == "--dragtest") { AttachConsole(ATTACH_PARENT_PROCESS); RunDragTest(); return; }
                 if (args[i] == "--screenshot" && i + 1 < args.Length) { RunScreenshot(args[i + 1]); return; }
             }
 
