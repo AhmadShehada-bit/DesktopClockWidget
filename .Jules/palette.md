@@ -7,3 +7,6 @@
 ## 2026-09-10 - [UX Improvements on List Controls]
 **Learning:** Destructive actions on lists, such as removing custom configurations, often lead to accidental data loss without prompt confirmation. In WPF, simple MessageBox prompts are sufficient for mitigating these issues for small, custom blocks.
 **Action:** When adding generic 'Delete' buttons on custom element lists, always include a confirmation prompt and provide clear UI feedback. Avoid making changes directly without user acknowledgment for potentially destructive events.
+## 2024-03-24 - [Added tooltips to ambiguous "Choose..." color picker buttons]
+**Learning:** Found multiple icon-like buttons in SettingsWindow.cs with text "Choose..." used for color picking that did not have any screen reader context, leading to ambiguity on what color was being chosen.
+**Action:** Use `CreateStyledButton` with the 3-argument version (`CreateStyledButton(string text, double width, string tooltip)`) to automatically assign accessible `ToolTip` and `AutomationProperties.Name` describing the button's exact function (e.g. "Choose global text color").
