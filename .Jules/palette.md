@@ -7,3 +7,6 @@
 ## 2026-09-10 - [UX Improvements on List Controls]
 **Learning:** Destructive actions on lists, such as removing custom configurations, often lead to accidental data loss without prompt confirmation. In WPF, simple MessageBox prompts are sufficient for mitigating these issues for small, custom blocks.
 **Action:** When adding generic 'Delete' buttons on custom element lists, always include a confirmation prompt and provide clear UI feedback. Avoid making changes directly without user acknowledgment for potentially destructive events.
+## 2026-09-21 - Accessible Tooltips for Action Buttons
+**Learning:** This application heavily relies on ambiguous, short text buttons (e.g., "Choose...", "+ Msg", "Delete") across various settings panels, which are inaccessible to screen readers. The `CreateStyledButton` helper provides a built-in mechanism (the 3rd string parameter) to automatically apply both `ToolTip` and `AutomationProperties.Name` to fix this.
+**Action:** Whenever creating or encountering icon-only or ambiguous text buttons, explicitly provide the 3rd argument to `CreateStyledButton` to ensure proper accessibility labels are set.
