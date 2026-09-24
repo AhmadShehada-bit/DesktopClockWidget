@@ -2796,14 +2796,17 @@ namespace DesktopClock
                 RefreshBlockMessagesList();
                 ApplyPreviewLive();
             };
-            _btnDelBlockMsg = CreateStyledButton("Delete", 60);
+            _btnDelBlockMsg = CreateStyledButton("Delete", 60, "Delete Selected Message");
             _btnDelBlockMsg.Click += (s, e) =>
             {
                 var b = GetSelectedBlock();
                 if (b == null || _lstBlockMessages.SelectedIndex < 0) return;
-                b.Messages.RemoveAt(_lstBlockMessages.SelectedIndex);
-                RefreshBlockMessagesList();
-                ApplyPreviewLive();
+                if (MessageBox.Show("Are you sure you want to delete this message?", "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+                {
+                    b.Messages.RemoveAt(_lstBlockMessages.SelectedIndex);
+                    RefreshBlockMessagesList();
+                    ApplyPreviewLive();
+                }
             };
             msgTools.Children.Add(_btnAddBlockMsg);
             msgTools.Children.Add(_btnDelBlockMsg);
@@ -2832,14 +2835,17 @@ namespace DesktopClock
                 RefreshBlockScheduleList();
                 ApplyPreviewLive();
             };
-            _btnDelSchedule = CreateStyledButton("Delete", 60);
+            _btnDelSchedule = CreateStyledButton("Delete", 60, "Delete Selected Schedule");
             _btnDelSchedule.Click += (s, e) =>
             {
                 var b = GetSelectedBlock();
                 if (b == null || _lstBlockSchedules.SelectedIndex < 0) return;
-                b.ScheduledMessages.RemoveAt(_lstBlockSchedules.SelectedIndex);
-                RefreshBlockScheduleList();
-                ApplyPreviewLive();
+                if (MessageBox.Show("Are you sure you want to delete this schedule?", "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+                {
+                    b.ScheduledMessages.RemoveAt(_lstBlockSchedules.SelectedIndex);
+                    RefreshBlockScheduleList();
+                    ApplyPreviewLive();
+                }
             };
             schedTools.Children.Add(_btnAddSchedule);
             schedTools.Children.Add(_btnDelSchedule);
@@ -4206,15 +4212,18 @@ namespace DesktopClock
             _btnAddTimezone.Click += (s, e) => ShowAddTimezoneDialog();
             btnBar.Children.Add(_btnAddTimezone);
 
-            _btnDeleteTimezone = CreateStyledButton("Delete", 80);
+            _btnDeleteTimezone = CreateStyledButton("Delete", 80, "Delete Selected Timezone");
             _btnDeleteTimezone.Margin = new Thickness(8, 0, 0, 0);
             _btnDeleteTimezone.Click += (s, e) =>
             {
                 if (_lstTimezones.SelectedIndex >= 0 && _preview.Timezones != null && _lstTimezones.SelectedIndex < _preview.Timezones.Count)
                 {
-                    _preview.Timezones.RemoveAt(_lstTimezones.SelectedIndex);
-                    RefreshTimezonesList();
-                    ApplyPreviewLive();
+                    if (MessageBox.Show("Are you sure you want to delete this timezone?", "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+                    {
+                        _preview.Timezones.RemoveAt(_lstTimezones.SelectedIndex);
+                        RefreshTimezonesList();
+                        ApplyPreviewLive();
+                    }
                 }
             };
             btnBar.Children.Add(_btnDeleteTimezone);
