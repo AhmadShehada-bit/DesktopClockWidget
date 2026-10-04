@@ -213,16 +213,10 @@ namespace DesktopClock
         private CheckBox _chkBlockGlitch;
         private Slider _sliderBlockGlitchInt;
         private TextBlock _lblBlockGlitchInt;
-        private ComboBox _cmbBlockGlitchSpeed;
-        private Rectangle _rectBlockGlitchC1Swatch;
-        private TextBlock _lblBlockGlitchC1Hex;
-        private Rectangle _rectBlockGlitchC2Swatch;
-        private TextBlock _lblBlockGlitchC2Hex;
 
         private CheckBox _chkBlockNoise;
         private Slider _sliderBlockNoiseAmt;
         private TextBlock _lblBlockNoiseAmt;
-        private ComboBox _cmbBlockNoiseSpeed;
 
         // Font Catalog Tab
         private ComboBox _cmbCatalogSource;
@@ -232,11 +226,16 @@ namespace DesktopClock
         private TextBlock _lblCatalogFontMeta;
         private TextBlock _lblCatalogSample;
         private TextBlock _lblCatalogStats;
+        private Button _btnApplyCatalogFont;
 
         // Position Tab
         private Button _btnEditPos;
         private Button _btnLockPos;
         private Button _btnCenter;
+        private ComboBox _cmbDisplaySelector;
+        private Button _btnMoveToDisplay;
+        private CheckBox _chkPositionLocked;
+        private CheckBox _chkClickThrough;
         private CheckBox _chkRunOnStartup;
         private TextBlock _lblCoordinates;
 
@@ -247,6 +246,7 @@ namespace DesktopClock
             _preview = SettingsManager.Clone(currentSettings);
 
             Title = "Desktop Clock Settings";
+            try { Icon = ClockWindow.LoadWindowIconSource(); } catch { }
             Width = 680;
             Height = 720;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
@@ -3738,8 +3738,14 @@ namespace DesktopClock
 
             _lstCatalogFonts.SelectionChanged += (s, e) =>
             {
+                if (_isUpdatingUi) return;
                 UpdateCatalogSample();
+            };
+
+            _lstCatalogFonts.MouseDoubleClick += (s, e) =>
+            {
                 ApplyCatalogFontToCurrentElement();
+                ApplyPreviewLive();
             };
 
             _lstCatalogFonts.PreviewMouseWheel += (s, e) =>
@@ -3848,6 +3854,17 @@ namespace DesktopClock
                 TextAlignment = TextAlignment.Center
             };
             sampleStack.Children.Add(_lblCatalogSample);
+
+            _btnApplyCatalogFont = CreateStyledButton("Apply Font to Selected Element", 220);
+            _btnApplyCatalogFont.Margin = new Thickness(0, 8, 0, 0);
+            _btnApplyCatalogFont.HorizontalAlignment = HorizontalAlignment.Center;
+            _btnApplyCatalogFont.Click += (s, e) =>
+            {
+                ApplyCatalogFontToCurrentElement();
+                ApplyPreviewLive();
+            };
+            sampleStack.Children.Add(_btnApplyCatalogFont);
+
             sampleBorder.Child = sampleStack;
             Grid.SetRow(sampleBorder, 2);
             root.Children.Add(sampleBorder);
@@ -3974,6 +3991,9 @@ namespace DesktopClock
 
         private UIElement CreateModulesTab()
         {
+            if (_preview.Weather == null) _preview.Weather = new WeatherSettings();
+            if (_preview.Metrics == null) _preview.Metrics = new MetricsSettings();
+
             var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
             var root = new StackPanel { Margin = new Thickness(14) };
 
@@ -3989,8 +4009,20 @@ namespace DesktopClock
                 FontWeight = FontWeights.Bold,
                 Margin = new Thickness(0, 0, 0, 8)
             };
-            _chkWeatherEnabled.Checked += (s, e) => { _preview.Weather.Enabled = true; ApplyPreviewLive(); };
-            _chkWeatherEnabled.Unchecked += (s, e) => { _preview.Weather.Enabled = false; ApplyPreviewLive(); };
+            _chkWeatherEnabled.Checked += (s, e) =>
+            {
+                if (_isUpdatingUi) return;
+                if (_preview.Weather == null) _preview.Weather = new WeatherSettings();
+                _preview.Weather.Enabled = true;
+                ApplyPreviewLive();
+            };
+            _chkWeatherEnabled.Unchecked += (s, e) =>
+            {
+                if (_isUpdatingUi) return;
+                if (_preview.Weather == null) _preview.Weather = new WeatherSettings();
+                _preview.Weather.Enabled = false;
+                ApplyPreviewLive();
+            };
             spW.Children.Add(_chkWeatherEnabled);
 
             spW.Children.Add(new TextBlock { Text = "City / Location Name:", Foreground = Brushes.LightGray, Margin = new Thickness(0, 4, 0, 2) });
@@ -3998,7 +4030,10 @@ namespace DesktopClock
             _txtWeatherCity.Text = _preview.Weather != null ? _preview.Weather.CityName : "London";
             _txtWeatherCity.TextChanged += (s, e) =>
             {
-                if (_preview.Weather != null) { _preview.Weather.CityName = _txtWeatherCity.Text.Trim(); ApplyPreviewLive(); }
+                if (_isUpdatingUi) return;
+                if (_preview.Weather == null) _preview.Weather = new WeatherSettings();
+                _preview.Weather.CityName = _txtWeatherCity.Text.Trim();
+                ApplyPreviewLive();
             };
             spW.Children.Add(_txtWeatherCity);
 
@@ -4008,10 +4043,13 @@ namespace DesktopClock
             _txtWeatherLat.Text = (_preview.Weather != null ? _preview.Weather.Latitude : 51.5074).ToString(CultureInfo.InvariantCulture);
             _txtWeatherLat.TextChanged += (s, e) =>
             {
+                if (_isUpdatingUi) return;
+                if (_preview.Weather == null) _preview.Weather = new WeatherSettings();
                 double val;
                 if (double.TryParse(_txtWeatherLat.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out val))
                 {
-                    _preview.Weather.Latitude = val; ApplyPreviewLive();
+                    _preview.Weather.Latitude = val;
+                    ApplyPreviewLive();
                 }
             };
             spCoords.Children.Add(_txtWeatherLat);
@@ -4021,10 +4059,13 @@ namespace DesktopClock
             _txtWeatherLon.Text = (_preview.Weather != null ? _preview.Weather.Longitude : -0.1278).ToString(CultureInfo.InvariantCulture);
             _txtWeatherLon.TextChanged += (s, e) =>
             {
+                if (_isUpdatingUi) return;
+                if (_preview.Weather == null) _preview.Weather = new WeatherSettings();
                 double val;
                 if (double.TryParse(_txtWeatherLon.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out val))
                 {
-                    _preview.Weather.Longitude = val; ApplyPreviewLive();
+                    _preview.Weather.Longitude = val;
+                    ApplyPreviewLive();
                 }
             };
             spCoords.Children.Add(_txtWeatherLon);
@@ -4038,11 +4079,10 @@ namespace DesktopClock
             _cmbWeatherUnit.SelectedIndex = (_preview.Weather != null && string.Equals(_preview.Weather.TemperatureUnit, "F", StringComparison.OrdinalIgnoreCase)) ? 1 : 0;
             _cmbWeatherUnit.SelectionChanged += (s, e) =>
             {
-                if (_preview.Weather != null)
-                {
-                    _preview.Weather.TemperatureUnit = _cmbWeatherUnit.SelectedIndex == 1 ? "F" : "C";
-                    ApplyPreviewLive();
-                }
+                if (_isUpdatingUi) return;
+                if (_preview.Weather == null) _preview.Weather = new WeatherSettings();
+                _preview.Weather.TemperatureUnit = _cmbWeatherUnit.SelectedIndex == 1 ? "F" : "C";
+                ApplyPreviewLive();
             };
             spWOptions.Children.Add(_cmbWeatherUnit);
 
@@ -4054,12 +4094,11 @@ namespace DesktopClock
             _cmbWeatherInterval.SelectedIndex = 1;
             _cmbWeatherInterval.SelectionChanged += (s, e) =>
             {
-                if (_preview.Weather != null)
-                {
-                    int m = _cmbWeatherInterval.SelectedIndex == 0 ? 15 : (_cmbWeatherInterval.SelectedIndex == 1 ? 30 : 60);
-                    _preview.Weather.UpdateIntervalMinutes = m;
-                    ApplyPreviewLive();
-                }
+                if (_isUpdatingUi) return;
+                if (_preview.Weather == null) _preview.Weather = new WeatherSettings();
+                int m = _cmbWeatherInterval.SelectedIndex == 0 ? 15 : (_cmbWeatherInterval.SelectedIndex == 1 ? 30 : 60);
+                _preview.Weather.UpdateIntervalMinutes = m;
+                ApplyPreviewLive();
             };
             spWOptions.Children.Add(_cmbWeatherInterval);
             spW.Children.Add(spWOptions);
@@ -4070,7 +4109,9 @@ namespace DesktopClock
             _cmbWeatherPos.SelectedItem = _preview.Weather != null ? _preview.Weather.Position : "Below Widget";
             _cmbWeatherPos.SelectionChanged += (s, e) =>
             {
-                if (_preview.Weather != null && _cmbWeatherPos.SelectedItem != null)
+                if (_isUpdatingUi) return;
+                if (_preview.Weather == null) _preview.Weather = new WeatherSettings();
+                if (_cmbWeatherPos.SelectedItem != null)
                 {
                     _preview.Weather.Position = _cmbWeatherPos.SelectedItem.ToString();
                     ApplyPreviewLive();
@@ -4082,11 +4123,9 @@ namespace DesktopClock
             _btnRefreshWeather.Margin = new Thickness(14, 0, 0, 0);
             _btnRefreshWeather.Click += (s, e) =>
             {
-                if (_preview.Weather != null)
-                {
-                    WeatherService.FetchWeatherAsync(_preview.Weather, null);
-                    ApplyPreviewLive();
-                }
+                if (_preview.Weather == null) _preview.Weather = new WeatherSettings();
+                WeatherService.FetchWeatherAsync(_preview.Weather, null);
+                ApplyPreviewLive();
             };
             spWPos.Children.Add(_btnRefreshWeather);
             spW.Children.Add(spWPos);
@@ -4106,19 +4145,55 @@ namespace DesktopClock
                 FontWeight = FontWeights.Bold,
                 Margin = new Thickness(0, 0, 0, 8)
             };
-            _chkMetricsEnabled.Checked += (s, e) => { _preview.Metrics.Enabled = true; ApplyPreviewLive(); };
-            _chkMetricsEnabled.Unchecked += (s, e) => { _preview.Metrics.Enabled = false; ApplyPreviewLive(); };
+            _chkMetricsEnabled.Checked += (s, e) =>
+            {
+                if (_isUpdatingUi) return;
+                if (_preview.Metrics == null) _preview.Metrics = new MetricsSettings();
+                _preview.Metrics.Enabled = true;
+                ApplyPreviewLive();
+            };
+            _chkMetricsEnabled.Unchecked += (s, e) =>
+            {
+                if (_isUpdatingUi) return;
+                if (_preview.Metrics == null) _preview.Metrics = new MetricsSettings();
+                _preview.Metrics.Enabled = false;
+                ApplyPreviewLive();
+            };
             spM.Children.Add(_chkMetricsEnabled);
 
             var spMChecks = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 6) };
             _chkMetricsCpu = new CheckBox { Content = "Show CPU %", IsChecked = _preview.Metrics != null && _preview.Metrics.ShowCpu, Foreground = Brushes.LightGray, Margin = new Thickness(0, 0, 16, 0) };
-            _chkMetricsCpu.Checked += (s, e) => { _preview.Metrics.ShowCpu = true; ApplyPreviewLive(); };
-            _chkMetricsCpu.Unchecked += (s, e) => { _preview.Metrics.ShowCpu = false; ApplyPreviewLive(); };
+            _chkMetricsCpu.Checked += (s, e) =>
+            {
+                if (_isUpdatingUi) return;
+                if (_preview.Metrics == null) _preview.Metrics = new MetricsSettings();
+                _preview.Metrics.ShowCpu = true;
+                ApplyPreviewLive();
+            };
+            _chkMetricsCpu.Unchecked += (s, e) =>
+            {
+                if (_isUpdatingUi) return;
+                if (_preview.Metrics == null) _preview.Metrics = new MetricsSettings();
+                _preview.Metrics.ShowCpu = false;
+                ApplyPreviewLive();
+            };
             spMChecks.Children.Add(_chkMetricsCpu);
 
             _chkMetricsRam = new CheckBox { Content = "Show RAM Usage (GB & %)", IsChecked = _preview.Metrics != null && _preview.Metrics.ShowRam, Foreground = Brushes.LightGray };
-            _chkMetricsRam.Checked += (s, e) => { _preview.Metrics.ShowRam = true; ApplyPreviewLive(); };
-            _chkMetricsRam.Unchecked += (s, e) => { _preview.Metrics.ShowRam = false; ApplyPreviewLive(); };
+            _chkMetricsRam.Checked += (s, e) =>
+            {
+                if (_isUpdatingUi) return;
+                if (_preview.Metrics == null) _preview.Metrics = new MetricsSettings();
+                _preview.Metrics.ShowRam = true;
+                ApplyPreviewLive();
+            };
+            _chkMetricsRam.Unchecked += (s, e) =>
+            {
+                if (_isUpdatingUi) return;
+                if (_preview.Metrics == null) _preview.Metrics = new MetricsSettings();
+                _preview.Metrics.ShowRam = false;
+                ApplyPreviewLive();
+            };
             spMChecks.Children.Add(_chkMetricsRam);
             spM.Children.Add(spMChecks);
 
@@ -4131,12 +4206,11 @@ namespace DesktopClock
             _cmbMetricsInterval.SelectedIndex = (_preview.Metrics != null && _preview.Metrics.UpdateIntervalSeconds == 1) ? 0 : ((_preview.Metrics != null && _preview.Metrics.UpdateIntervalSeconds == 5) ? 2 : 1);
             _cmbMetricsInterval.SelectionChanged += (s, e) =>
             {
-                if (_preview.Metrics != null)
-                {
-                    int sec = _cmbMetricsInterval.SelectedIndex == 0 ? 1 : (_cmbMetricsInterval.SelectedIndex == 2 ? 5 : 2);
-                    _preview.Metrics.UpdateIntervalSeconds = sec;
-                    ApplyPreviewLive();
-                }
+                if (_isUpdatingUi) return;
+                if (_preview.Metrics == null) _preview.Metrics = new MetricsSettings();
+                int sec = _cmbMetricsInterval.SelectedIndex == 0 ? 1 : (_cmbMetricsInterval.SelectedIndex == 2 ? 5 : 2);
+                _preview.Metrics.UpdateIntervalSeconds = sec;
+                ApplyPreviewLive();
             };
             spMOptions.Children.Add(_cmbMetricsInterval);
 
@@ -4145,7 +4219,9 @@ namespace DesktopClock
             _cmbMetricsPos.SelectedItem = _preview.Metrics != null ? _preview.Metrics.Position : "Below Widget";
             _cmbMetricsPos.SelectionChanged += (s, e) =>
             {
-                if (_preview.Metrics != null && _cmbMetricsPos.SelectedItem != null)
+                if (_isUpdatingUi) return;
+                if (_preview.Metrics == null) _preview.Metrics = new MetricsSettings();
+                if (_cmbMetricsPos.SelectedItem != null)
                 {
                     _preview.Metrics.Position = _cmbMetricsPos.SelectedItem.ToString();
                     ApplyPreviewLive();
@@ -4159,6 +4235,34 @@ namespace DesktopClock
 
             scroll.Content = root;
             return scroll;
+        }
+
+        private void LoadModulesValues()
+        {
+            if (_preview.Weather == null) _preview.Weather = new WeatherSettings();
+            if (_preview.Metrics == null) _preview.Metrics = new MetricsSettings();
+
+            if (_chkWeatherEnabled != null) _chkWeatherEnabled.IsChecked = _preview.Weather.Enabled;
+            if (_txtWeatherCity != null) _txtWeatherCity.Text = _preview.Weather.CityName ?? "London";
+            if (_txtWeatherLat != null) _txtWeatherLat.Text = _preview.Weather.Latitude.ToString(CultureInfo.InvariantCulture);
+            if (_txtWeatherLon != null) _txtWeatherLon.Text = _preview.Weather.Longitude.ToString(CultureInfo.InvariantCulture);
+            if (_cmbWeatherUnit != null) _cmbWeatherUnit.SelectedIndex = string.Equals(_preview.Weather.TemperatureUnit, "F", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+            if (_cmbWeatherInterval != null)
+            {
+                int min = _preview.Weather.UpdateIntervalMinutes;
+                _cmbWeatherInterval.SelectedIndex = min <= 15 ? 0 : (min >= 60 ? 2 : 1);
+            }
+            if (_cmbWeatherPos != null) _cmbWeatherPos.SelectedItem = _preview.Weather.Position ?? "Below Widget";
+
+            if (_chkMetricsEnabled != null) _chkMetricsEnabled.IsChecked = _preview.Metrics.Enabled;
+            if (_chkMetricsCpu != null) _chkMetricsCpu.IsChecked = _preview.Metrics.ShowCpu;
+            if (_chkMetricsRam != null) _chkMetricsRam.IsChecked = _preview.Metrics.ShowRam;
+            if (_cmbMetricsInterval != null)
+            {
+                int sec = _preview.Metrics.UpdateIntervalSeconds;
+                _cmbMetricsInterval.SelectedIndex = sec <= 1 ? 0 : (sec >= 5 ? 2 : 1);
+            }
+            if (_cmbMetricsPos != null) _cmbMetricsPos.SelectedItem = _preview.Metrics.Position ?? "Below Widget";
         }
 
         // ==========================================
@@ -4342,34 +4446,94 @@ namespace DesktopClock
         {
             var root = new StackPanel { Margin = new Thickness(12) };
 
-            var grpPos = CreateGroupBox("Window Placement & Stable Anchor");
+            var grpPos = CreateGroupBox("Window Placement & Multi-Monitor Support");
             var stackPos = new StackPanel { Margin = new Thickness(8) };
 
-            _btnEditPos = CreateStyledButton("Edit Position (Ctrl+Alt+C)", 200);
+            var spButtons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
+            _btnEditPos = CreateStyledButton("Edit Position (Ctrl+Alt+C)", 180);
             _btnEditPos.Click += (s, e) =>
             {
                 _host.SetEditing(true);
                 UpdatePositionButtons();
             };
-            stackPos.Children.Add(_btnEditPos);
+            spButtons.Children.Add(_btnEditPos);
 
-            _btnLockPos = CreateStyledButton("Lock Position", 200);
-            _btnLockPos.Margin = new Thickness(0, 8, 0, 0);
+            _btnLockPos = CreateStyledButton("Lock Position", 140);
+            _btnLockPos.Margin = new Thickness(8, 0, 0, 0);
             _btnLockPos.Click += (s, e) =>
             {
                 _host.SetEditing(false);
                 UpdatePositionButtons();
             };
-            stackPos.Children.Add(_btnLockPos);
+            spButtons.Children.Add(_btnLockPos);
 
-            _btnCenter = CreateStyledButton("Center on Screen", 200);
-            _btnCenter.Margin = new Thickness(0, 8, 0, 0);
+            _btnCenter = CreateStyledButton("Center Primary", 140);
+            _btnCenter.Margin = new Thickness(8, 0, 0, 0);
             _btnCenter.Click += (s, e) =>
             {
                 _host.CenterOnScreen();
                 UpdatePositionDisplay();
             };
-            stackPos.Children.Add(_btnCenter);
+            spButtons.Children.Add(_btnCenter);
+            stackPos.Children.Add(spButtons);
+
+            // Multi-Monitor display picker
+            var spDisplays = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 8) };
+            spDisplays.Children.Add(new TextBlock { Text = "Target Monitor: ", Foreground = Brushes.LightGray, VerticalAlignment = VerticalAlignment.Center });
+            _cmbDisplaySelector = CreateComboBox(270);
+            spDisplays.Children.Add(_cmbDisplaySelector);
+
+            _btnMoveToDisplay = CreateStyledButton("Center on Display", 150);
+            _btnMoveToDisplay.Margin = new Thickness(8, 0, 0, 0);
+            _btnMoveToDisplay.Click += (s, e) =>
+            {
+                if (_cmbDisplaySelector != null && _cmbDisplaySelector.SelectedIndex >= 0)
+                {
+                    _host.CenterOnDisplay(_cmbDisplaySelector.SelectedIndex);
+                    UpdatePositionDisplay();
+                }
+            };
+            spDisplays.Children.Add(_btnMoveToDisplay);
+            stackPos.Children.Add(spDisplays);
+
+            _chkPositionLocked = new CheckBox
+            {
+                Content = "Lock Position (Prevent dragging)",
+                FontWeight = FontWeights.Medium,
+                Margin = new Thickness(0, 8, 0, 0)
+            };
+            _chkPositionLocked.Click += (s, e) =>
+            {
+                if (_isUpdatingUi) return;
+                _preview.PositionLocked = _chkPositionLocked.IsChecked == true;
+                _host.SetEditing(!_preview.PositionLocked);
+                UpdatePositionButtons();
+                ApplyPreviewLive();
+            };
+            stackPos.Children.Add(_chkPositionLocked);
+
+            _chkClickThrough = new CheckBox
+            {
+                Content = "Click-Through Mode (Transparent to mouse clicks)",
+                FontWeight = FontWeights.Medium,
+                Margin = new Thickness(0, 8, 0, 0)
+            };
+            _chkClickThrough.Click += (s, e) =>
+            {
+                if (_isUpdatingUi) return;
+                _preview.ClickThrough = _chkClickThrough.IsChecked == true;
+                ApplyPreviewLive();
+            };
+            stackPos.Children.Add(_chkClickThrough);
+
+            _chkRunOnStartup = new CheckBox { Content = "Run on Windows Startup", FontWeight = FontWeights.Medium, Margin = new Thickness(0, 10, 0, 0) };
+            _chkRunOnStartup.Click += (s, e) =>
+            {
+                if (_isUpdatingUi) return;
+                _preview.RunOnStartup = _chkRunOnStartup.IsChecked == true;
+                ApplyPreviewLive();
+            };
+            stackPos.Children.Add(_chkRunOnStartup);
 
             _lblCoordinates = new TextBlock
             {
@@ -4378,15 +4542,6 @@ namespace DesktopClock
                 Margin = new Thickness(0, 12, 0, 0)
             };
             stackPos.Children.Add(_lblCoordinates);
-
-            _chkRunOnStartup = new CheckBox { Content = "Run on Windows Startup", FontWeight = FontWeights.Medium, Margin = new Thickness(0, 12, 0, 0) };
-            _chkRunOnStartup.Click += (s, e) =>
-            {
-                if (_isUpdatingUi) return;
-                _preview.RunOnStartup = _chkRunOnStartup.IsChecked == true;
-                ApplyPreviewLive();
-            };
-            stackPos.Children.Add(_chkRunOnStartup);
 
             grpPos.Content = stackPos;
             root.Children.Add(grpPos);
@@ -4398,6 +4553,26 @@ namespace DesktopClock
         {
             if (_btnEditPos != null) _btnEditPos.IsEnabled = !_host.IsEditing;
             if (_btnLockPos != null) _btnLockPos.IsEnabled = _host.IsEditing;
+            if (_chkPositionLocked != null) _chkPositionLocked.IsChecked = !_host.IsEditing;
+        }
+
+        private void LoadPositionValues()
+        {
+            if (_cmbDisplaySelector != null)
+            {
+                _cmbDisplaySelector.Items.Clear();
+                var displays = MultiMonitorHelper.GetDisplays();
+                for (int i = 0; i < displays.Count; i++)
+                {
+                    var d = displays[i];
+                    _cmbDisplaySelector.Items.Add(string.Format("Display {0}: {1} ({2:F0}x{3:F0}{4})", i + 1, d.DeviceName, d.Bounds.Width, d.Bounds.Height, d.IsPrimary ? " - Primary" : ""));
+                }
+                if (_cmbDisplaySelector.Items.Count > 0) _cmbDisplaySelector.SelectedIndex = 0;
+            }
+
+            if (_chkPositionLocked != null) _chkPositionLocked.IsChecked = _preview.PositionLocked;
+            if (_chkClickThrough != null) _chkClickThrough.IsChecked = _preview.ClickThrough;
+            if (_chkRunOnStartup != null) _chkRunOnStartup.IsChecked = _preview.RunOnStartup;
         }
 
         private void UpdatePositionDisplay()
@@ -4439,6 +4614,8 @@ namespace DesktopClock
                 RefreshBlocksList();
                 PopulateCatalogList();
                 PopulateThemesList();
+                LoadModulesValues();
+                LoadPositionValues();
 
                 _chkRunOnStartup.IsChecked = _preview.RunOnStartup;
                 UpdatePositionButtons();

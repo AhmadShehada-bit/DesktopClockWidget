@@ -669,6 +669,7 @@ namespace DesktopClock
         {
             var list = new List<DisplayInfo>();
             var screens = System.Windows.Forms.Screen.AllScreens;
+            double scale = ClockWindow.GetDpiScale();
             for (int i = 0; i < screens.Length; i++)
             {
                 var s = screens[i];
@@ -677,8 +678,8 @@ namespace DesktopClock
                     Index = i,
                     DeviceName = s.DeviceName,
                     IsPrimary = s.Primary,
-                    Bounds = new Rect(s.Bounds.X, s.Bounds.Y, s.Bounds.Width, s.Bounds.Height),
-                    WorkArea = new Rect(s.WorkingArea.X, s.WorkingArea.Y, s.WorkingArea.Width, s.WorkingArea.Height)
+                    Bounds = new Rect(s.Bounds.X / scale, s.Bounds.Y / scale, s.Bounds.Width / scale, s.Bounds.Height / scale),
+                    WorkArea = new Rect(s.WorkingArea.X / scale, s.WorkingArea.Y / scale, s.WorkingArea.Width / scale, s.WorkingArea.Height / scale)
                 });
             }
             return list;
@@ -690,8 +691,11 @@ namespace DesktopClock
             if (displays.Count == 0) return;
             var target = (displayIndex >= 0 && displayIndex < displays.Count) ? displays[displayIndex] : displays[0];
 
-            double w = window.ActualWidth > 0 ? window.ActualWidth : 320;
-            double h = window.ActualHeight > 0 ? window.ActualHeight : 240;
+            window.UpdateLayout();
+            double w = window.ActualWidth > 10 ? window.ActualWidth : window.DesiredSize.Width;
+            double h = window.ActualHeight > 10 ? window.ActualHeight : window.DesiredSize.Height;
+            if (w < 10) w = 320;
+            if (h < 10) h = 240;
 
             double newLeft = target.WorkArea.X + (target.WorkArea.Width - w) / 2.0;
             double newTop = target.WorkArea.Y + (target.WorkArea.Height - h) / 2.0;
@@ -719,19 +723,44 @@ namespace DesktopClock
             double h = window.ActualHeight > 0 ? window.ActualHeight : 240;
             Rect winRect = new Rect(window.Left, window.Top, w, h);
 
-            bool intersectsAny = false;
+            DisplayInfo containingDisplay = null;
             foreach (var d in displays)
             {
                 if (d.Bounds.IntersectsWith(winRect))
                 {
-                    intersectsAny = true;
+                    containingDisplay = d;
                     break;
                 }
             }
 
-            if (!intersectsAny)
+            if (containingDisplay == null)
             {
-                CenterOnDisplay(window, 0, settings);
+                int targetIdx = (settings != null && settings.SelectedDisplayIndex >= 0) ? settings.SelectedDisplayIndex : 0;
+                CenterOnDisplay(window, targetIdx, settings);
+                return;
+            }
+
+            double newLeft = window.Left;
+            double newTop = window.Top;
+
+            if (newLeft < containingDisplay.WorkArea.Left) newLeft = containingDisplay.WorkArea.Left;
+            if (newTop < containingDisplay.WorkArea.Top) newTop = containingDisplay.WorkArea.Top;
+            if (newLeft + w > containingDisplay.WorkArea.Right) newLeft = Math.Max(containingDisplay.WorkArea.Left, containingDisplay.WorkArea.Right - w);
+            if (newTop + h > containingDisplay.WorkArea.Bottom) newTop = Math.Max(containingDisplay.WorkArea.Top, containingDisplay.WorkArea.Bottom - h);
+
+            if (Math.Abs(window.Left - newLeft) > 0.001 || Math.Abs(window.Top - newTop) > 0.001)
+            {
+                window.Left = newLeft;
+                window.Top = newTop;
+                if (settings != null)
+                {
+                    settings.Left = newLeft;
+                    settings.Top = newTop;
+                    settings.AnchorX = newLeft + (w / 2.0);
+                    settings.AnchorY = newTop + (h / 2.0);
+                    settings.HasAnchor = true;
+                    settings.SelectedDisplayIndex = containingDisplay.Index;
+                }
             }
         }
     }
@@ -1160,7 +1189,7 @@ namespace DesktopClock
             EveningStart = 17;
             NightStart = 22;
 
-            ClickThrough = true;
+            ClickThrough = false;
             PositionLocked = true;
             RunOnStartup = false;
             HasAnchor = false;
@@ -1211,7 +1240,7 @@ namespace DesktopClock
                 Type = "Symbol",
                 Position = "Above Widget",
                 Order = 0,
-                SymbolContent = "âœ¦",
+                SymbolContent = "\u2726",
                 FontFamily = "Segoe UI Symbol",
                 FontWeight = "Regular",
                 FontSize = 16,
@@ -1230,7 +1259,7 @@ namespace DesktopClock
                 Type = "Symbol",
                 Position = "Below Widget",
                 Order = 0,
-                SymbolContent = "â—‡",
+                SymbolContent = "\u25C7",
                 FontFamily = "Segoe UI Symbol",
                 FontWeight = "Regular",
                 FontSize = 16,
@@ -1302,7 +1331,7 @@ namespace DesktopClock
                         Type = "Symbol",
                         Position = "Above Widget",
                         Order = 0,
-                        SymbolContent = "âœ¦",
+                        SymbolContent = "\u2726",
                         FontFamily = settings.LegacyTopSymbol.FontFamily ?? "Segoe UI Symbol",
                         FontWeight = settings.LegacyTopSymbol.FontWeight ?? "Regular",
                         FontSize = settings.LegacyTopSymbol.FontSize > 0 ? settings.LegacyTopSymbol.FontSize : 16,
@@ -1322,7 +1351,7 @@ namespace DesktopClock
                         Type = "Symbol",
                         Position = "Above Widget",
                         Order = 0,
-                        SymbolContent = "âœ¦",
+                        SymbolContent = "\u2726",
                         FontFamily = "Segoe UI Symbol",
                         FontWeight = "Regular",
                         FontSize = 16,
@@ -1343,7 +1372,7 @@ namespace DesktopClock
                         Type = "Symbol",
                         Position = "Below Widget",
                         Order = 0,
-                        SymbolContent = "â—‡",
+                        SymbolContent = "\u25C7",
                         FontFamily = settings.LegacyBottomSymbol.FontFamily ?? "Segoe UI Symbol",
                         FontWeight = settings.LegacyBottomSymbol.FontWeight ?? "Regular",
                         FontSize = settings.LegacyBottomSymbol.FontSize > 0 ? settings.LegacyBottomSymbol.FontSize : 16,
@@ -1363,7 +1392,7 @@ namespace DesktopClock
                         Type = "Symbol",
                         Position = "Below Widget",
                         Order = 0,
-                        SymbolContent = "â—‡",
+                        SymbolContent = "\u25C7",
                         FontFamily = "Segoe UI Symbol",
                         FontWeight = "Regular",
                         FontSize = 16,
@@ -1375,6 +1404,31 @@ namespace DesktopClock
                 }
             }
 
+            if (settings.Weather == null) settings.Weather = new WeatherSettings { Enabled = false };
+            if (settings.Metrics == null) settings.Metrics = new MetricsSettings { Enabled = false };
+            if (settings.Timezones == null) settings.Timezones = new List<TimezoneItem>();
+
+            // Sanitize block symbols against past mojibake / corrupted saves
+            if (settings.Blocks != null)
+            {
+                foreach (var b in settings.Blocks)
+                {
+                    if (b != null && string.Equals(b.Type, "Symbol", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (string.IsNullOrEmpty(b.SymbolContent) ||
+                            b.SymbolContent.IndexOf('\uFFFD') >= 0 ||
+                            b.SymbolContent.IndexOf('�') >= 0 ||
+                            b.SymbolContent.IndexOf('â') >= 0 ||
+                            b.SymbolContent == "o" || b.SymbolContent == "-")
+                        {
+                            b.SymbolContent = (b.Position != null && b.Position.ToLowerInvariant().Contains("below"))
+                                ? "\u25C7"
+                                : "\u2726";
+                        }
+                    }
+                }
+            }
+
             // Normalize block settings
             foreach (var b in settings.Blocks)
             {
@@ -1382,7 +1436,7 @@ namespace DesktopClock
                 if (string.IsNullOrEmpty(b.Name)) b.Name = "Block";
                 if (string.IsNullOrEmpty(b.Type)) b.Type = "Symbol";
                 if (string.IsNullOrEmpty(b.Position)) b.Position = "Above Widget";
-                if (string.IsNullOrEmpty(b.SymbolContent)) b.SymbolContent = "âœ¦";
+                if (string.IsNullOrEmpty(b.SymbolContent)) b.SymbolContent = "\u2726";
                 if (b.Messages == null) b.Messages = new List<string> { "KEEP GOING", "NO ZERO DAYS" };
                 if (string.IsNullOrEmpty(b.RotationMode)) b.RotationMode = "Sequential";
                 if (b.IntervalValue <= 0) b.IntervalValue = 30;
@@ -2285,9 +2339,8 @@ namespace DesktopClock
                 else if (string.Equals(textCase, "Title", StringComparison.OrdinalIgnoreCase)) s = TextCaseHelper.ApplyCase(s, "Title");
 
                 var ft = new FormattedText(s, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, tf, Math.Max(6, size), brush);
-                var g = ft.BuildGeometry(new Point(0, 0));
-                double w = (g != null && !g.Bounds.IsEmpty) ? g.Bounds.Width : ft.Width;
-                double h = (g != null && !g.Bounds.IsEmpty) ? g.Bounds.Height : ft.Height;
+                double w = ft.WidthIncludingTrailingWhitespace > 0 ? ft.WidthIncludingTrailingWhitespace : ft.Width;
+                double h = ft.Height;
 
                 if (w > maxW) maxW = w;
                 if (h > maxH) maxH = h;
@@ -2299,27 +2352,15 @@ namespace DesktopClock
 
         public static List<string> GetTimeCandidates(WidgetSettings settings)
         {
-            var list = new List<string>();
-            var culture = CultureInfo.InvariantCulture;
-            
-            // Sample all 24 hours and all typical proportional digit variations
-            int[] hours = new int[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23 };
-            int[] minutes = new int[] { 0, 1, 8, 9, 10, 11, 19, 20, 28, 38, 48, 59 };
-
-            foreach (int h in hours)
+            return new List<string>
             {
-                foreach (int m in minutes)
-                {
-                    var dt = new DateTime(2026, 8, 30, h, m, 0);
-                    list.Add(dt.ToString("hh:mm tt", culture));
-                    list.Add(dt.ToString("h:mm tt", culture));
-                    list.Add(dt.ToString("HH:mm", culture));
-                    list.Add(dt.ToString("H:mm", culture));
-                    list.Add(dt.ToString("hh:mm:ss tt", culture));
-                    list.Add(dt.ToString("HH:mm:ss", culture));
-                }
-            }
-            return list;
+                "08:08 AM", "08:08 PM", "12:58 PM", "11:11 AM", "10:08 PM",
+                "8:08 AM", "8:08 PM", "12:58 PM", "1:11 AM",
+                "00:00", "08:08", "12:58", "23:58", "11:11",
+                "0:00", "8:08", "12:58", "23:58",
+                "08:08:08 AM", "08:08:08 PM", "12:58:58 PM", "11:11:11 AM",
+                "00:00:00", "08:08:08", "12:58:58", "23:58:58"
+            };
         }
 
         public static List<string> GetWeekdayCandidates()
@@ -2854,6 +2895,7 @@ namespace DesktopClock
         double Top { get; }
         double AnchorX { get; }
         double AnchorY { get; }
+        void CenterOnDisplay(int displayIndex);
     }
 
     public class ClockWindow : Window, ISettingsHost
@@ -2919,7 +2961,8 @@ namespace DesktopClock
         private const int WM_TIMECHANGE = 0x001E;
 
         [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-        private static extern uint RegisterWindowMessage(string lpString);
+        public static extern uint RegisterWindowMessage(string lpString);
+        public static uint WmActivateApp = 0;
         [DllImport("user32.dll", SetLastError = true)]
         private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
         [DllImport("user32.dll", SetLastError = true)]
@@ -2965,6 +3008,7 @@ namespace DesktopClock
             ResizeMode = ResizeMode.NoResize;
             SizeToContent = SizeToContent.WidthAndHeight;
             WindowStartupLocation = WindowStartupLocation.Manual;
+            try { Icon = LoadWindowIconSource(); } catch { }
 
             _root = new Border
             {
@@ -3049,7 +3093,6 @@ namespace DesktopClock
 
         public void ApplySettings()
         {
-            _settings.PositionLocked = _settings.ClickThrough;
             if (_settings.Greeting != null) Fonts.PinFamily(_settings.Greeting.FontFamily);
             if (_settings.Weekday != null) Fonts.PinFamily(_settings.Weekday.FontFamily);
             if (_settings.Time != null) Fonts.PinFamily(_settings.Time.FontFamily);
@@ -3472,12 +3515,24 @@ namespace DesktopClock
                 double newLeft = _settings.AnchorX - (w / 2.0);
                 double newTop = _settings.AnchorY - (h / 2.0);
 
+                double vl = SystemParameters.VirtualScreenLeft;
+                double vt = SystemParameters.VirtualScreenTop;
+                double vw = SystemParameters.VirtualScreenWidth;
+                double vh = SystemParameters.VirtualScreenHeight;
+
+                if (newLeft < vl) newLeft = vl;
+                if (newTop < vt) newTop = vt;
+                if (newLeft + w > vl + vw) newLeft = Math.Max(vl, vl + vw - w);
+                if (newTop + h > vt + vh) newTop = Math.Max(vt, vt + vh - h);
+
                 if (Math.Abs(Left - newLeft) > 0.001 || Math.Abs(Top - newTop) > 0.001)
                 {
                     Left = newLeft;
                     Top = newTop;
                     _settings.Left = Left;
                     _settings.Top = Top;
+                    _settings.AnchorX = Left + (w / 2.0);
+                    _settings.AnchorY = Top + (h / 2.0);
                 }
             }
             finally
@@ -3499,6 +3554,7 @@ namespace DesktopClock
 
         public void ApplyClickThrough(bool clickThrough)
         {
+            _settings.ClickThrough = clickThrough;
             IntPtr hwnd = WindowHandle;
             if (hwnd == IntPtr.Zero) return;
             int es = GetWindowLong(hwnd, GWL_EXSTYLE);
@@ -3808,6 +3864,7 @@ namespace DesktopClock
                         _settings.HasAnchor = true;
                         SaveSettings();
                     }
+                    MultiMonitorHelper.ClampToVisibleScreen(this, _settings);
                     ClampIntoVisible();
                 }
                 else
@@ -3856,6 +3913,18 @@ namespace DesktopClock
             else if (_wmTaskbarCreated != 0 && (uint)msg == _wmTaskbarCreated)
             {
                 CreateTrayIcon();
+                handled = true;
+            }
+            else if (msg == 0x007E /*WM_DISPLAYCHANGE*/)
+            {
+                MultiMonitorHelper.ClampToVisibleScreen(this, _settings);
+                PositionWindowAroundAnchor();
+                handled = true;
+            }
+            else if (WmActivateApp != 0 && (uint)msg == WmActivateApp)
+            {
+                ShowSettings();
+                Activate();
                 handled = true;
             }
             return IntPtr.Zero;
@@ -3938,61 +4007,20 @@ namespace DesktopClock
             catch { }
         }
 
-        public void CenterOnScreen()
+        public void CenterOnDisplay(int displayIndex)
         {
-            try
-            {
-                IntPtr hwnd = WindowHandle;
-                if (hwnd == IntPtr.Zero) return;
-
-                var mi = new MONITORINFO();
-                mi.cbSize = Marshal.SizeOf(typeof(MONITORINFO));
-                IntPtr mon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-                if (!GetMonitorInfo(mon, out mi)) return;
-
-                double scale = GetDpiScale();
-                int workLeft = mi.rcWork.Left;
-                int workTop = mi.rcWork.Top;
-                double workW = (mi.rcWork.Right - mi.rcWork.Left) / scale;
-                double workH = (mi.rcWork.Bottom - mi.rcWork.Top) / scale;
-
-                UpdateLayout();
-                double w = ActualWidth > 10 ? ActualWidth : DesiredSize.Width;
-                double h = ActualHeight > 10 ? ActualHeight : DesiredSize.Height;
-                if (w < 10 || h < 10)
-                {
-                    Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-                    w = DesiredSize.Width;
-                    h = DesiredSize.Height;
-                }
-
-                double centerX = (workLeft / scale) + (workW / 2.0);
-                double centerY = (workTop / scale) + (workH / 2.0);
-
-                _settings.AnchorX = centerX;
-                _settings.AnchorY = centerY;
-                _settings.HasAnchor = true;
-
-                Left = centerX - (w / 2.0);
-                Top = centerY - (h / 2.0);
-                _settings.Left = Left;
-                _settings.Top = Top;
-                SaveSettings();
-            }
-            catch
-            {
-                Left = (SystemParameters.PrimaryScreenWidth - 300) / 2.0;
-                Top = (SystemParameters.PrimaryScreenHeight - 200) / 2.0;
-                _settings.AnchorX = Left + 150;
-                _settings.AnchorY = Top + 100;
-                _settings.HasAnchor = true;
-                _settings.Left = Left;
-                _settings.Top = Top;
-                SaveSettings();
-            }
+            MultiMonitorHelper.CenterOnDisplay(this, displayIndex, _settings);
+            UpdateZ();
+            SaveSettings();
         }
 
-        private static double GetDpiScale()
+        public void CenterOnScreen()
+        {
+            int idx = (_settings != null && _settings.SelectedDisplayIndex >= 0) ? _settings.SelectedDisplayIndex : 0;
+            CenterOnDisplay(idx);
+        }
+
+        public static double GetDpiScale()
         {
             try
             {
@@ -4145,7 +4173,6 @@ namespace DesktopClock
                 int es = GetWindowLong(hwnd, GWL_EXSTYLE);
                 if (on)
                 {
-                    _settings.ClickThrough = false;
                     _settings.PositionLocked = false;
                     es &= ~WS_EX_TRANSPARENT;
                     es &= ~WS_EX_NOACTIVATE;
@@ -4158,7 +4185,6 @@ namespace DesktopClock
                 }
                 else
                 {
-                    _settings.ClickThrough = true;
                     _settings.PositionLocked = true;
 
                     UpdateLayout();
@@ -4170,7 +4196,10 @@ namespace DesktopClock
                     _settings.Left = Left;
                     _settings.Top = Top;
 
-                    es |= WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT;
+                    es |= WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE;
+                    if (_settings.ClickThrough) es |= WS_EX_TRANSPARENT;
+                    else es &= ~WS_EX_TRANSPARENT;
+
                     SetWindowLong(hwnd, GWL_EXSTYLE, es);
                     SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
                     _root.Cursor = System.Windows.Input.Cursors.Arrow;
@@ -4189,31 +4218,98 @@ namespace DesktopClock
 
         private void Widget_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
-            if (!_editing) return;
-            if (e.LeftButton == System.Windows.Input.MouseButtonState.Pressed)
+            if (e.ClickCount == 2)
             {
-                try
+                ShowSettings();
+                e.Handled = true;
+                return;
+            }
+
+            if (_editing || !_settings.PositionLocked)
+            {
+                if (e.LeftButton == System.Windows.Input.MouseButtonState.Pressed)
                 {
-                    DragMove();
-                    UpdateLayout();
-                    double w = ActualWidth > 0 ? ActualWidth : DesiredSize.Width;
-                    double h = ActualHeight > 0 ? ActualHeight : DesiredSize.Height;
-                    _settings.AnchorX = Left + (w / 2.0);
-                    _settings.AnchorY = Top + (h / 2.0);
-                    _settings.HasAnchor = true;
-                    _settings.Left = Left;
-                    _settings.Top = Top;
-                    SaveSettings();
+                    try
+                    {
+                        DragMove();
+                        UpdateLayout();
+                        double w = ActualWidth > 0 ? ActualWidth : DesiredSize.Width;
+                        double h = ActualHeight > 0 ? ActualHeight : DesiredSize.Height;
+                        _settings.AnchorX = Left + (w / 2.0);
+                        _settings.AnchorY = Top + (h / 2.0);
+                        _settings.HasAnchor = true;
+                        _settings.Left = Left;
+                        _settings.Top = Top;
+                        SaveSettings();
+                    }
+                    catch { }
                 }
-                catch { }
             }
         }
 
         private void Widget_MouseRightButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
-            if (!_editing) return;
-            ShowSettings();
+            ShowWidgetContextMenu();
             e.Handled = true;
+        }
+
+        private void ShowWidgetContextMenu()
+        {
+            var menu = new System.Windows.Controls.ContextMenu();
+            menu.Background = new SolidColorBrush(Color.FromRgb(32, 34, 37));
+            menu.Foreground = Brushes.White;
+            menu.BorderBrush = new SolidColorBrush(Color.FromRgb(75, 85, 99));
+
+            var header = new System.Windows.Controls.MenuItem
+            {
+                Header = "DesktopClock Widget",
+                IsEnabled = false,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(Color.FromRgb(0, 240, 255))
+            };
+            menu.Items.Add(header);
+            menu.Items.Add(new Separator());
+
+            var itemSettings = new System.Windows.Controls.MenuItem { Header = "Settings... (Double-Click)", Foreground = Brushes.White };
+            itemSettings.Click += (s, e) => ShowSettings();
+            menu.Items.Add(itemSettings);
+
+            var itemEdit = new System.Windows.Controls.MenuItem
+            {
+                Header = _editing ? "Lock Position (Ctrl+Alt+C)" : "Edit / Move Position (Ctrl+Alt+C)",
+                Foreground = Brushes.White,
+                IsChecked = _editing
+            };
+            itemEdit.Click += (s, e) => SetEditing(!_editing);
+            menu.Items.Add(itemEdit);
+
+            var itemCenter = new System.Windows.Controls.MenuItem { Header = "Center on Screen", Foreground = Brushes.White };
+            itemCenter.Click += (s, e) => { CenterOnScreen(); SaveSettings(); };
+            menu.Items.Add(itemCenter);
+
+            menu.Items.Add(new Separator());
+
+            var itemClickThrough = new System.Windows.Controls.MenuItem
+            {
+                Header = "Click-Through Mode (Transparent)",
+                Foreground = Brushes.White,
+                IsChecked = _settings.ClickThrough
+            };
+            itemClickThrough.Click += (s, e) =>
+            {
+                _settings.ClickThrough = !_settings.ClickThrough;
+                ApplyClickThrough(_settings.ClickThrough);
+                SaveSettings();
+            };
+            menu.Items.Add(itemClickThrough);
+
+            menu.Items.Add(new Separator());
+
+            var itemExit = new System.Windows.Controls.MenuItem { Header = "Exit", Foreground = Brushes.White };
+            itemExit.Click += (s, e) => Close();
+            menu.Items.Add(itemExit);
+
+            menu.IsOpen = true;
         }
 
         private static uint _wmTaskbarCreated = 0;
@@ -4320,6 +4416,23 @@ namespace DesktopClock
 
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         private static extern bool DestroyIcon(IntPtr handle);
+
+        public static ImageSource LoadWindowIconSource()
+        {
+            try
+            {
+                var icon = LoadOfficialIcon();
+                if (icon != null)
+                {
+                    return System.Windows.Interop.Imaging.CreateBitmapSourceFromHIcon(
+                        icon.Handle,
+                        Int32Rect.Empty,
+                        BitmapSizeOptions.FromEmptyOptions());
+                }
+            }
+            catch { }
+            return null;
+        }
 
         private static System.Drawing.Icon LoadOfficialIcon()
         {
@@ -4464,6 +4577,9 @@ namespace DesktopClock
             try { File.AppendAllText(CrashLog, DateTime.Now + "\r\n" + (e.ExceptionObject as Exception) + "\r\n\r\n"); } catch { }
         }
 
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        private static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+        private static readonly IntPtr HWND_BROADCAST = new IntPtr(0xffff);
         private static System.Threading.Mutex _appMutex;
         private static ClockWindow _mainWindow;
 
@@ -4482,13 +4598,32 @@ namespace DesktopClock
             string[] args = Environment.GetCommandLineArgs();
             for (int i = 1; i < args.Length; i++)
             {
-                if (args[i] == "--selftest") { AttachConsole(ATTACH_PARENT_PROCESS); RunSelfTest(); return; }
-                if (args[i] == "--dragtest") { AttachConsole(ATTACH_PARENT_PROCESS); RunDragTest(); return; }
-                if (args[i] == "--screenshot" && i + 1 < args.Length) { RunScreenshot(args[i + 1]); return; }
+                if (args[i] == "--selftest")
+                {
+                    AttachConsole(ATTACH_PARENT_PROCESS);
+                    try { Console.SetOut(new System.IO.StreamWriter(Console.OpenStandardOutput(), System.Text.Encoding.UTF8) { AutoFlush = true }); } catch { }
+                    RunSelfTest();
+                    return;
+                }
+                if (args[i] == "--dragtest")
+                {
+                    AttachConsole(ATTACH_PARENT_PROCESS);
+                    try { Console.SetOut(new System.IO.StreamWriter(Console.OpenStandardOutput(), System.Text.Encoding.UTF8) { AutoFlush = true }); } catch { }
+                    RunDragTest();
+                    return;
+                }
+                if (args[i] == "--screenshot" && i + 1 < args.Length)
+                {
+                    AttachConsole(ATTACH_PARENT_PROCESS);
+                    try { Console.SetOut(new System.IO.StreamWriter(Console.OpenStandardOutput(), System.Text.Encoding.UTF8) { AutoFlush = true }); } catch { }
+                    RunScreenshot(args[i + 1]);
+                    return;
+                }
             }
 
             try { SetProcessDpiAwarenessContext(new IntPtr(-4)); } catch { }
 
+            try { ClockWindow.WmActivateApp = ClockWindow.RegisterWindowMessage("DesktopClockWidget_ActivateApp"); } catch { }
             bool createdNew;
             _appMutex = new System.Threading.Mutex(true, @"Local\DesktopClockWidget_SingleInstance_User", out createdNew);
             if (!createdNew)
@@ -4505,7 +4640,11 @@ namespace DesktopClock
             }
             if (!createdNew)
             {
-                ClockWindow.LogTrayDebug("SingleInstance mutex already held, exiting duplicate instance.");
+                ClockWindow.LogTrayDebug("SingleInstance mutex already held, signaling active instance.");
+                if (ClockWindow.WmActivateApp != 0)
+                {
+                    PostMessage(HWND_BROADCAST, ClockWindow.WmActivateApp, IntPtr.Zero, IntPtr.Zero);
+                }
                 return;
             }
 
@@ -4662,7 +4801,6 @@ namespace DesktopClock
             // PHASE 1: STABLE ANCHOR TESTS
             // 20. Anchor visual center invariance across varying time widths ("01:11 PM", "08:08 PM", "11:11 PM", "12:59 AM")
             double fixedAnchorX = 500.0;
-            double fixedAnchorY = 300.0;
             string[] timeStrings = new string[] { "01:11 PM", "08:08 PM", "11:11 PM", "12:59 AM" };
             bool timeWidthAnchorPass = true;
             double maxTimeDrift = 0.0;
@@ -5362,7 +5500,7 @@ namespace DesktopClock
             sb.AppendLine("RESULT: " + (ok ? "PASS" : "FAIL"));
             string res = sb.ToString();
             Console.WriteLine(res);
-            try { File.WriteAllText(SelftestResult, res); } catch { }
+            try { File.WriteAllText(SelftestResult, res, System.Text.Encoding.UTF8); } catch { }
             Environment.ExitCode = ok ? 0 : 1;
         }
 
@@ -5412,7 +5550,7 @@ namespace DesktopClock
             sb.AppendLine("RESULT: " + (ok ? "PASS" : "FAIL"));
             string res = sb.ToString();
             Console.WriteLine(res);
-            try { File.WriteAllText(DragtestResult, res); } catch { }
+            try { File.WriteAllText(DragtestResult, res, System.Text.Encoding.UTF8); } catch { }
             Environment.ExitCode = ok ? 0 : 1;
         }
 

@@ -6,7 +6,7 @@ if not exist "%~dp0bin\Release" mkdir "%~dp0bin\Release"
 if not exist "%~dp0bin\Release\Fonts" mkdir "%~dp0bin\Release\Fonts"
 
 echo Compiling DesktopClockWidget.exe (x86 optimized)...
-"%CSC%" /target:winexe /optimize+ /platform:x86 /out:"%~dp0bin\Release\DesktopClockWidget.exe" /win32icon:"%~dp0app.ico" /r:"%WPF_DIR%\PresentationCore.dll" /r:"%WPF_DIR%\PresentationFramework.dll" /r:"%WPF_DIR%\WindowsBase.dll" /r:System.Xaml.dll /r:System.dll /r:System.Core.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.Runtime.Serialization.dll "%~dp0src\DesktopClockWidget\DesktopClockWidget.cs" "%~dp0src\DesktopClockWidget\SettingsWindow.cs" "%~dp0src\DesktopClockWidget\Properties\AssemblyInfo.cs"
+"%CSC%" /target:winexe /optimize+ /platform:x86 /codepage:65001 /utf8output /out:"%~dp0bin\Release\DesktopClockWidget.exe" /win32icon:"%~dp0app.ico" /r:"%WPF_DIR%\PresentationCore.dll" /r:"%WPF_DIR%\PresentationFramework.dll" /r:"%WPF_DIR%\WindowsBase.dll" /r:System.Xaml.dll /r:System.dll /r:System.Core.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.Runtime.Serialization.dll "%~dp0src\DesktopClockWidget\DesktopClockWidget.cs" "%~dp0src\DesktopClockWidget\SettingsWindow.cs" "%~dp0src\DesktopClockWidget\Properties\AssemblyInfo.cs"
 
 if errorlevel 1 (
     echo [ERROR] Compilation failed.
