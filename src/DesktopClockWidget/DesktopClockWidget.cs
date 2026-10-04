@@ -576,6 +576,7 @@ namespace DesktopClock
 
                     var req = (HttpWebRequest)WebRequest.Create(url);
                     req.Timeout = 8000;
+                    req.ReadWriteTimeout = 5000;
                     req.UserAgent = "DesktopClockWidget/1.1.0 (Windows)";
 
                     using (var resp = (HttpWebResponse)req.GetResponse())
@@ -1117,6 +1118,7 @@ namespace DesktopClock
         }
     }
 
+    [DataContract]
     public class WidgetSettings
     {
         [DataMember] public double Left { get; set; }
@@ -1417,13 +1419,24 @@ namespace DesktopClock
                     {
                         if (string.IsNullOrEmpty(b.SymbolContent) ||
                             b.SymbolContent.IndexOf('\uFFFD') >= 0 ||
-                            b.SymbolContent.IndexOf('�') >= 0 ||
-                            b.SymbolContent.IndexOf('â') >= 0 ||
+                            b.SymbolContent.IndexOf('?') >= 0 ||
+                            b.SymbolContent.IndexOf('\u00E2') >= 0 ||
                             b.SymbolContent == "o" || b.SymbolContent == "-")
                         {
                             b.SymbolContent = (b.Position != null && b.Position.ToLowerInvariant().Contains("below"))
                                 ? "\u25C7"
                                 : "\u2726";
+                        }
+                    }
+                    else if (b != null && (string.Equals(b.Type, "Corner", StringComparison.OrdinalIgnoreCase) ||
+                             (b.CornerShape != null && b.CornerShape.StartsWith("Corner"))))
+                    {
+                        if (string.IsNullOrEmpty(b.SymbolContent) ||
+                            b.SymbolContent.IndexOf('\uFFFD') >= 0 ||
+                            b.SymbolContent.IndexOf('?') >= 0 ||
+                            b.SymbolContent.IndexOf('\u00E2') >= 0)
+                        {
+                            b.SymbolContent = BlockEvaluator.GetCornerGlyph(b);
                         }
                     }
                 }
@@ -2964,6 +2977,9 @@ namespace DesktopClock
         public static extern uint RegisterWindowMessage(string lpString);
         public static uint WmActivateApp = 0;
         [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool ChangeWindowMessageFilterEx(IntPtr hWnd, uint msg, uint action, IntPtr pChangeFilterStruct);
+        private const uint MSGFLT_ALLOW = 1;
+        [DllImport("user32.dll", SetLastError = true)]
         private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
         [DllImport("user32.dll", SetLastError = true)]
         private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
@@ -3648,8 +3664,8 @@ namespace DesktopClock
                     ApplyClickThrough(false);
             }
 
-            // 7. Reposition window: ONLY call Win32 SetWindowPos if coordinates or anchor changed
-            if (old != null && (old.Left != _settings.Left || old.Top != _settings.Top || old.AnchorX != _settings.AnchorX || old.AnchorY != _settings.AnchorY))
+            // 7. Reposition window: ONLY call Win32 SetWindowPos if coordinates, anchor, or scale changed
+            if (old == null || old.Left != _settings.Left || old.Top != _settings.Top || old.AnchorX != _settings.AnchorX || old.AnchorY != _settings.AnchorY || Math.Abs(old.Scale - _settings.Scale) > 0.0001)
             {
                 PositionWindowAroundAnchor();
             }
@@ -3952,6 +3968,19 @@ namespace DesktopClock
                 catch { }
             }
             SaveSettings();
+            if (_openSettingsWindow != null)
+            {
+                try { _openSettingsWindow.Close(); } catch { }
+                _openSettingsWindow = null;
+            }
+            try
+            {
+                if (Application.Current != null)
+                {
+                    Application.Current.Shutdown();
+                }
+            }
+            catch { }
         }
 
         protected override void OnSourceInitialized(EventArgs e)
@@ -3966,6 +3995,11 @@ namespace DesktopClock
                 if (_settings.ClickThrough && !_editing) es |= WS_EX_TRANSPARENT;
                 SetWindowLong(hwnd, GWL_EXSTYLE, es);
                 UpdateZ();
+
+                if (WmActivateApp != 0)
+                {
+                    try { ChangeWindowMessageFilterEx(hwnd, WmActivateApp, MSGFLT_ALLOW, IntPtr.Zero); } catch { }
+                }
             }
         }
 
@@ -3996,11 +4030,17 @@ namespace DesktopClock
                 if (w < 10) w = 300;
                 if (h < 10) h = 200;
 
-                if (Left + w < vl + 50) Left = vl;
-                if (Left > vl + vw - 50) Left = vl + vw - w;
-                if (Top + h < vt + 50) Top = vt;
-                if (Top > vt + vh - 50) Top = vt + vh - h;
+                double newLeft = Left;
+                double newTop = Top;
+                if (newLeft < vl) newLeft = vl;
+                if (newTop < vt) newTop = vt;
+                if (newLeft + w > vl + vw) newLeft = Math.Max(vl, vl + vw - w);
+                if (newTop + h > vt + vh) newTop = Math.Max(vt, vt + vh - h);
 
+                Left = newLeft;
+                Top = newTop;
+                _settings.Left = newLeft;
+                _settings.Top = newTop;
                 _settings.AnchorX = Left + (w / 2.0);
                 _settings.AnchorY = Top + (h / 2.0);
             }
@@ -4417,17 +4457,33 @@ namespace DesktopClock
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         private static extern bool DestroyIcon(IntPtr handle);
 
+        private static ImageSource _cachedWindowIconSource = null;
+
         public static ImageSource LoadWindowIconSource()
         {
+            if (_cachedWindowIconSource != null) return _cachedWindowIconSource;
             try
             {
-                var icon = LoadOfficialIcon();
-                if (icon != null)
+                using (var icon = LoadOfficialIcon())
                 {
-                    return System.Windows.Interop.Imaging.CreateBitmapSourceFromHIcon(
-                        icon.Handle,
-                        Int32Rect.Empty,
-                        BitmapSizeOptions.FromEmptyOptions());
+                    if (icon != null)
+                    {
+                        IntPtr hIcon = icon.Handle;
+                        try
+                        {
+                            var bs = System.Windows.Interop.Imaging.CreateBitmapSourceFromHIcon(
+                                hIcon,
+                                Int32Rect.Empty,
+                                BitmapSizeOptions.FromEmptyOptions());
+                            if (bs.CanFreeze) bs.Freeze();
+                            _cachedWindowIconSource = bs;
+                            return _cachedWindowIconSource;
+                        }
+                        finally
+                        {
+                            DestroyIcon(hIcon);
+                        }
+                    }
                 }
             }
             catch { }
@@ -4565,6 +4621,7 @@ namespace DesktopClock
 
         public App()
         {
+            ShutdownMode = ShutdownMode.OnMainWindowClose;
             AppDomain.CurrentDomain.UnhandledException += OnCrash;
             DispatcherUnhandledException += delegate(object s, DispatcherUnhandledExceptionEventArgs e)
             {

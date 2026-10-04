@@ -328,7 +328,8 @@ namespace DesktopClock
             btnApply.Click += (s, e) =>
             {
                 _applied = true;
-                _host.CommitSettings(_preview);
+                _original = SettingsManager.Clone(_preview);
+                if (_host != null) _host.CommitSettings(_preview);
                 Fonts.ClearPreviewCache();
             };
 
@@ -336,7 +337,7 @@ namespace DesktopClock
             btnOk.Click += (s, e) =>
             {
                 _applied = true;
-                _host.CommitSettings(_preview);
+                if (_host != null) _host.CommitSettings(_preview);
                 Fonts.ClearPreviewCache();
                 Close();
             };
@@ -344,7 +345,7 @@ namespace DesktopClock
             var btnCancel = CreateStyledButton("Cancel", 80);
             btnCancel.Click += (s, e) =>
             {
-                if (!_applied) _host.ApplyPreview(_original);
+                if (_host != null) _host.ApplyPreview(_original);
                 Fonts.ClearPreviewCache();
                 Close();
             };
@@ -360,8 +361,11 @@ namespace DesktopClock
             PreviewKeyDown += SettingsWindow_PreviewKeyDown;
             Closing += (s, e) =>
             {
-                _host.SetElementEditingHighlight(null);
-                if (!_applied) _host.ApplyPreview(_original);
+                if (_host != null)
+                {
+                    _host.SetElementEditingHighlight(null);
+                    if (!_applied) _host.ApplyPreview(_original);
+                }
                 Fonts.ClearPreviewCache();
             };
         }
@@ -3913,7 +3917,7 @@ namespace DesktopClock
         {
             if (_lstCatalogFonts.SelectedItem == null) return;
             string item = _lstCatalogFonts.SelectedItem.ToString().Trim();
-            if (item.StartsWith("★ ")) item = item.Substring(2).Trim();
+            if (item.StartsWith("\u2605 ") || item.StartsWith("★ ") || item.StartsWith("? ") || item.StartsWith("* ")) item = item.Substring(2).Trim();
             int tagIdx = item.IndexOf(" [");
             if (tagIdx > 0) item = item.Substring(0, tagIdx).Trim();
 
@@ -3949,7 +3953,7 @@ namespace DesktopClock
         {
             if (_lstCatalogFonts.SelectedItem == null) return;
             string item = _lstCatalogFonts.SelectedItem.ToString().Trim();
-            if (item.StartsWith("★ ")) item = item.Substring(2).Trim();
+            if (item.StartsWith("\u2605 ") || item.StartsWith("★ ") || item.StartsWith("? ") || item.StartsWith("* ")) item = item.Substring(2).Trim();
             int tagIdx = item.IndexOf(" [");
             if (tagIdx > 0) item = item.Substring(0, tagIdx).Trim();
 
@@ -4341,8 +4345,8 @@ namespace DesktopClock
                 var sp = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(4) };
                 var chk = new CheckBox { IsChecked = tz.Enabled, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
                 var capturedTz = tz;
-                chk.Checked += (s, e) => { capturedTz.Enabled = true; ApplyPreviewLive(); };
-                chk.Unchecked += (s, e) => { capturedTz.Enabled = false; ApplyPreviewLive(); };
+                chk.Checked += (s, e) => { if (!_isUpdatingUi) { capturedTz.Enabled = true; ApplyPreviewLive(); } };
+                chk.Unchecked += (s, e) => { if (!_isUpdatingUi) { capturedTz.Enabled = false; ApplyPreviewLive(); } };
                 sp.Children.Add(chk);
 
                 var txt = new TextBlock
@@ -4615,6 +4619,7 @@ namespace DesktopClock
                 PopulateCatalogList();
                 PopulateThemesList();
                 LoadModulesValues();
+                RefreshTimezonesList();
                 LoadPositionValues();
 
                 _chkRunOnStartup.IsChecked = _preview.RunOnStartup;
