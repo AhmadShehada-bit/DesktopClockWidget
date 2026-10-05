@@ -2805,9 +2805,12 @@ namespace DesktopClock
             {
                 var b = GetSelectedBlock();
                 if (b == null || _lstBlockMessages.SelectedIndex < 0) return;
-                b.Messages.RemoveAt(_lstBlockMessages.SelectedIndex);
-                RefreshBlockMessagesList();
-                ApplyPreviewLive();
+                if (MessageBox.Show("Are you sure you want to delete this message?", "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+                {
+                    b.Messages.RemoveAt(_lstBlockMessages.SelectedIndex);
+                    RefreshBlockMessagesList();
+                    ApplyPreviewLive();
+                }
             };
             msgTools.Children.Add(_btnAddBlockMsg);
             msgTools.Children.Add(_btnDelBlockMsg);
@@ -2841,9 +2844,12 @@ namespace DesktopClock
             {
                 var b = GetSelectedBlock();
                 if (b == null || _lstBlockSchedules.SelectedIndex < 0) return;
-                b.ScheduledMessages.RemoveAt(_lstBlockSchedules.SelectedIndex);
-                RefreshBlockScheduleList();
-                ApplyPreviewLive();
+                if (MessageBox.Show("Are you sure you want to delete this scheduled message?", "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+                {
+                    b.ScheduledMessages.RemoveAt(_lstBlockSchedules.SelectedIndex);
+                    RefreshBlockScheduleList();
+                    ApplyPreviewLive();
+                }
             };
             schedTools.Children.Add(_btnAddSchedule);
             schedTools.Children.Add(_btnDelSchedule);
@@ -4320,9 +4326,12 @@ namespace DesktopClock
             {
                 if (_lstTimezones.SelectedIndex >= 0 && _preview.Timezones != null && _lstTimezones.SelectedIndex < _preview.Timezones.Count)
                 {
-                    _preview.Timezones.RemoveAt(_lstTimezones.SelectedIndex);
-                    RefreshTimezonesList();
-                    ApplyPreviewLive();
+                    if (MessageBox.Show("Are you sure you want to delete this timezone?", "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+                    {
+                        _preview.Timezones.RemoveAt(_lstTimezones.SelectedIndex);
+                        RefreshTimezonesList();
+                        ApplyPreviewLive();
+                    }
                 }
             };
             btnBar.Children.Add(_btnDeleteTimezone);
