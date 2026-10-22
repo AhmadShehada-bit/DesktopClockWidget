@@ -7,3 +7,6 @@
 ## 2026-09-10 - [UX Improvements on List Controls]
 **Learning:** Destructive actions on lists, such as removing custom configurations, often lead to accidental data loss without prompt confirmation. In WPF, simple MessageBox prompts are sufficient for mitigating these issues for small, custom blocks.
 **Action:** When adding generic 'Delete' buttons on custom element lists, always include a confirmation prompt and provide clear UI feedback. Avoid making changes directly without user acknowledgment for potentially destructive events.
+## 2026-09-12 - [Confirmations on Nested List Controls]
+**Learning:** Destructive actions on secondary or nested lists, such as removing scheduled messages or custom configurations, often lack the confirmation safeguards implemented on primary elements. This oversight can lead to frustrating UX where a single misclick deletes a complex rule or configuration without warning.
+**Action:** When auditing or implementing UI for lists, actively check secondary tabs and nested collections. Ensure all destructive generic 'Delete' buttons utilize `MessageBox.Show` with `MessageBoxButton.YesNo` and `MessageBoxImage.Warning`, while also providing clear accessible tooltips.
