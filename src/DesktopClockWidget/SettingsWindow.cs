@@ -481,7 +481,7 @@ namespace DesktopClock
             _lblGlobalColorHex = new TextBlock { Text = "#D6D3D0", Width = 75, VerticalAlignment = VerticalAlignment.Center };
             colorRow.Children.Add(_lblGlobalColorHex);
 
-            var btnPickGlobalColor = CreateStyledButton("Choose...", 80);
+            var btnPickGlobalColor = CreateStyledButton("Choose...", 80, "Choose global text color");
             btnPickGlobalColor.Click += (s, e) =>
             {
                 var dlg = new ColorDialog();
@@ -1410,7 +1410,7 @@ namespace DesktopClock
             colorRow.Children.Add(_rectCoreElemColorSwatch);
             _lblCoreElemColorHex = new TextBlock { Text = "#D6D3D0", Width = 70, VerticalAlignment = VerticalAlignment.Center };
             colorRow.Children.Add(_lblCoreElemColorHex);
-            var btnColor = CreateStyledButton("Choose...", 75);
+            var btnColor = CreateStyledButton("Choose...", 75, "Choose core element color");
             btnColor.Click += (s, e) =>
             {
                 var dlg = new ColorDialog();
@@ -1767,7 +1767,7 @@ namespace DesktopClock
             outColRow.Children.Add(_rectCoreElemOutlineSwatch);
             _lblCoreElemOutlineHex = new TextBlock { Text = "#000000", Width = 65, VerticalAlignment = VerticalAlignment.Center };
             outColRow.Children.Add(_lblCoreElemOutlineHex);
-            var btnOutCol = CreateStyledButton("Choose...", 70);
+            var btnOutCol = CreateStyledButton("Choose...", 70, "Choose core outline color");
             btnOutCol.Click += (s, e) =>
             {
                 var dlg = new ColorDialog();
@@ -2970,7 +2970,7 @@ namespace DesktopClock
             _lblBlockColorHex = new TextBlock { Text = "#D6D3D0", Width = 65, VerticalAlignment = VerticalAlignment.Center };
             rowCo.Children.Add(_lblBlockColorHex);
 
-            var btnBColor = CreateStyledButton("Choose...", 70);
+            var btnBColor = CreateStyledButton("Choose...", 70, "Choose custom block color");
             btnBColor.Click += (s, e) =>
             {
                 var dlg = new ColorDialog();
