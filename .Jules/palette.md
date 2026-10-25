@@ -7,3 +7,6 @@
 ## 2026-09-10 - [UX Improvements on List Controls]
 **Learning:** Destructive actions on lists, such as removing custom configurations, often lead to accidental data loss without prompt confirmation. In WPF, simple MessageBox prompts are sufficient for mitigating these issues for small, custom blocks.
 **Action:** When adding generic 'Delete' buttons on custom element lists, always include a confirmation prompt and provide clear UI feedback. Avoid making changes directly without user acknowledgment for potentially destructive events.
+## 2026-09-14 - Adding Tooltips to Ambiguous Buttons
+**Learning:** When using ARIA or accessible names in WPF, utilizing `System.Windows.Automation.AutomationProperties.SetName` along with `ToolTip` ensures elements have descriptive accessible names (especially for ambiguous buttons like 'Choose...').
+**Action:** Use existing methods like `CreateStyledButton` that take a tooltip string to apply these accessibility improvements cleanly.
