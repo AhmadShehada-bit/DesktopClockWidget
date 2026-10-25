@@ -7,3 +7,7 @@
 ## 2026-09-10 - [UX Improvements on List Controls]
 **Learning:** Destructive actions on lists, such as removing custom configurations, often lead to accidental data loss without prompt confirmation. In WPF, simple MessageBox prompts are sufficient for mitigating these issues for small, custom blocks.
 **Action:** When adding generic 'Delete' buttons on custom element lists, always include a confirmation prompt and provide clear UI feedback. Avoid making changes directly without user acknowledgment for potentially destructive events.
+
+## 2026-09-17 - [Add Accessible Names to Generic Color Picker Buttons]
+**Learning:** The UI used multiple identical "Choose..." buttons next to color swatches. While visually clear, this layout provides no context for screen readers parsing interactive elements sequentially.
+**Action:** When implementing repeating interactive controls (like color pickers) that rely entirely on visual layout for context, always provide specific, descriptive labels (e.g. "Choose Global Text Color") through accessible name properties like `AutomationProperties.Name` or `ToolTip`.
