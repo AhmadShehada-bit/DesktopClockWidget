@@ -7,3 +7,6 @@
 ## 2026-09-10 - [UX Improvements on List Controls]
 **Learning:** Destructive actions on lists, such as removing custom configurations, often lead to accidental data loss without prompt confirmation. In WPF, simple MessageBox prompts are sufficient for mitigating these issues for small, custom blocks.
 **Action:** When adding generic 'Delete' buttons on custom element lists, always include a confirmation prompt and provide clear UI feedback. Avoid making changes directly without user acknowledgment for potentially destructive events.
+## 2024-05-19 - [Confirmation on Timezone Delete]
+**Learning:** Destructive actions without a confirmation dialog can easily cause accidental data loss, which makes for a poor user experience.
+**Action:** When creating a delete button, always wrap the removal logic in a `MessageBox.Show` checking for user confirmation first. Also, provide context using `ToolTip` / `AutomationProperties.Name` when the text itself (e.g. "Delete") is too generic.

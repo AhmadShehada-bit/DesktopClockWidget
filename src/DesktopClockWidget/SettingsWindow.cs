@@ -4314,15 +4314,18 @@ namespace DesktopClock
             _btnAddTimezone.Click += (s, e) => ShowAddTimezoneDialog();
             btnBar.Children.Add(_btnAddTimezone);
 
-            _btnDeleteTimezone = CreateStyledButton("Delete", 80);
+            _btnDeleteTimezone = CreateStyledButton("Delete", 80, "Delete Timezone");
             _btnDeleteTimezone.Margin = new Thickness(8, 0, 0, 0);
             _btnDeleteTimezone.Click += (s, e) =>
             {
                 if (_lstTimezones.SelectedIndex >= 0 && _preview.Timezones != null && _lstTimezones.SelectedIndex < _preview.Timezones.Count)
                 {
-                    _preview.Timezones.RemoveAt(_lstTimezones.SelectedIndex);
-                    RefreshTimezonesList();
-                    ApplyPreviewLive();
+                    if (MessageBox.Show("Are you sure you want to delete this timezone?", "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+                    {
+                        _preview.Timezones.RemoveAt(_lstTimezones.SelectedIndex);
+                        RefreshTimezonesList();
+                        ApplyPreviewLive();
+                    }
                 }
             };
             btnBar.Children.Add(_btnDeleteTimezone);
